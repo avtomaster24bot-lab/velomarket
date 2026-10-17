@@ -15,7 +15,15 @@
 </head>
 <body class="home">
 <main id="app">
-<section class="hero"><div class="wrap">
+<section class="hero has-photo">
+<picture class="hero-bg" aria-hidden="true">
+  <source media="(max-width: 640px)" type="image/webp" srcset="assets/hero/hero-m-720.webp">
+  <source media="(max-width: 640px)" srcset="assets/hero/hero-m-720.jpg">
+  <source type="image/webp" srcset="assets/hero/hero-1024.webp 1024w, assets/hero/hero-1600.webp 1600w" sizes="100vw">
+  <img src="assets/hero/hero-1600.jpg" srcset="assets/hero/hero-1024.jpg 1024w, assets/hero/hero-1600.jpg 1600w" sizes="100vw" alt="" fetchpriority="high" decoding="async">
+</picture>
+<svg class="hero-wheel" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="50" cy="50" r="6" fill="currentColor"/><g stroke="currentColor" stroke-width=".8"><line x1="50" y1="50" x2="96.0" y2="50.0"/><line x1="50" y1="50" x2="92.5" y2="67.6"/><line x1="50" y1="50" x2="82.5" y2="82.5"/><line x1="50" y1="50" x2="67.6" y2="92.5"/><line x1="50" y1="50" x2="50.0" y2="96.0"/><line x1="50" y1="50" x2="32.4" y2="92.5"/><line x1="50" y1="50" x2="17.5" y2="82.5"/><line x1="50" y1="50" x2="7.5" y2="67.6"/><line x1="50" y1="50" x2="4.0" y2="50.0"/><line x1="50" y1="50" x2="7.5" y2="32.4"/><line x1="50" y1="50" x2="17.5" y2="17.5"/><line x1="50" y1="50" x2="32.4" y2="7.5"/><line x1="50" y1="50" x2="50.0" y2="4.0"/><line x1="50" y1="50" x2="67.6" y2="7.5"/><line x1="50" y1="50" x2="82.5" y2="17.5"/><line x1="50" y1="50" x2="92.5" y2="32.4"/></g></svg>
+<div class="wrap">
   <h1>Велосипеды и запчасти. <span class="lime">Только оригинал.</span></h1>
   <p>Каждое объявление проверяет модератор: серийный номер рамы, фото бренда, реплики и подделки не публикуются.</p>
   <form class="big-search" action="list.html">

@@ -120,8 +120,10 @@ async function ads() {
       <div class="row"><div class="field"><label>Место</label><select name="slot">${Object.entries(SLOTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="field"><label>Название (для себя)</label><input name="title" maxlength="120"></div></div>
       <div class="field"><label>Ссылка при клике *</label><input name="url" type="url" required placeholder="https://"></div>
-      <div class="row"><div class="field"><label>Картинка: URL</label><input name="image_url" placeholder="https://… или загрузите файл"></div>
-        <div class="field"><label>…или файл (до 2 МБ)</label><input type="file" id="ad-file" accept="image/jpeg,image/png,image/webp,image/gif"></div></div>
+      <div class="row"><div class="field"><label>Картинка с компьютера/телефона</label><input type="file" id="ad-file" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="hint" id="ad-size-hint">Рекомендуемый размер: 1200×240 (широкий баннер). Фото сожмётся автоматически и загрузится в хранилище.</p></div>
+        <div class="field"><label>…или ссылка на картинку</label><input name="image_url" placeholder="https://…"></div></div>
+      <div class="ad-preview" id="ad-preview" hidden><img alt="Предпросмотр баннера"></div>
       <div class="row"><div class="field"><label>Показывать с</label><input name="starts_at" type="datetime-local"></div><div class="field"><label>по</label><input name="ends_at" type="datetime-local"></div></div>
       <div class="row"><div class="field"><label>Порядок</label><input name="position" type="number" value="0"></div><div class="field"><label class="check" style="margin-top:28px"><input type="checkbox" name="active" checked> Активен</label></div></div>
       <button class="btn btn-primary">Сохранить баннер</button> <button type="reset" class="btn btn-ghost">Очистить</button>
@@ -131,15 +133,23 @@ async function ads() {
       <td>${a.starts_at ? new Date(a.starts_at).toLocaleDateString('ru-RU') : '—'} – ${a.ends_at ? new Date(a.ends_at).toLocaleDateString('ru-RU') : '∞'}</td><td>${a.active ? '🟢 активен' : '⚪ выключен'}</td>
       <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-edit="${a.id}">Изменить</button> <button class="btn btn-danger btn-sm" data-del="${a.id}">Удалить</button></td></tr>`).join('')}</table></div>`;
   const f = $('#ad-form');
+  const prev = $('#ad-preview'), sizeHint = $('#ad-size-hint');
+  const showPrev = (src) => { prev.hidden = !src; if (src) prev.querySelector('img').src = src; prev.classList.toggle('side', f.slot.value === 'listing_side'); };
+  const setHint = () => { sizeHint.textContent = `Рекомендуемый размер: ${f.slot.value === 'listing_side' ? '360×600 (вертикальный)' : '1200×240 (широкий баннер)'}. Фото сожмётся автоматически и загрузится в хранилище.`; prev.classList.toggle('side', f.slot.value === 'listing_side'); };
+  f.slot.onchange = setHint;
+  $('#ad-file').onchange = (e) => { const file = e.target.files[0]; showPrev(file ? URL.createObjectURL(file) : f.image_url.value.trim()); };
+  f.image_url.oninput = () => { if (!$('#ad-file').files[0]) showPrev(f.image_url.value.trim()); };
+  f.onreset = () => setTimeout(() => { showPrev(''); setHint(); });
   pane.onclick = async (e) => {
     const t = e.target.dataset;
-    if (t.edit) { const a = list.find((x) => x.id === +t.edit); for (const k of ['id', 'slot', 'title', 'url', 'image_url', 'position']) f[k].value = a[k] ?? ''; f.starts_at.value = dt(a.starts_at); f.ends_at.value = dt(a.ends_at); f.active.checked = a.active; scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (t.edit) { const a = list.find((x) => x.id === +t.edit); for (const k of ['id', 'slot', 'title', 'url', 'image_url', 'position']) f[k].value = a[k] ?? ''; f.starts_at.value = dt(a.starts_at); f.ends_at.value = dt(a.ends_at); f.active.checked = a.active; $('#ad-file').value = ''; setHint(); showPrev(a.image_url); scrollTo({ top: 0, behavior: 'smooth' }); }
     if (t.del && confirm('Удалить баннер?')) { try { await api.adminDeleteAd(+t.del); ads(); } catch (err) { toast(err.message, 'err'); } }
   };
   f.onsubmit = async (e) => {
     e.preventDefault();
     try {
       const file = $('#ad-file').files[0];
+      const btn = f.querySelector('button.btn-primary'); btn.disabled = true; btn.textContent = file ? 'Загружаем картинку…' : 'Сохраняем…';
       const image_url = file ? await api.adminUploadAdImage(file) : f.image_url.value.trim();
       if (!image_url) throw new Error('Добавьте картинку');
       if (!/^https?:\/\//.test(f.url.value)) throw new Error('Ссылка должна начинаться с https://');
@@ -147,7 +157,7 @@ async function ads() {
         starts_at: f.starts_at.value ? new Date(f.starts_at.value).toISOString() : null, ends_at: f.ends_at.value ? new Date(f.ends_at.value).toISOString() : null,
         position: f.position.value, active: f.active.checked });
       toast('Баннер сохранён'); ads();
-    } catch (err) { toast(err.message, 'err'); }
+    } catch (err) { toast(err.message, 'err'); const btn = f.querySelector('button.btn-primary'); btn.disabled = false; btn.textContent = 'Сохранить баннер'; }
   };
 }
 async function brands() {

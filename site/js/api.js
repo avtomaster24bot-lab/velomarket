@@ -421,12 +421,22 @@ export async function adminDeleteAd(id) {
 }
 export async function adminUploadAdImage(file) {
   await requireAdmin();
-  if (IS_DEMO) return URL.createObjectURL(file);
   if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) throw new Error('Только JPG, PNG, WebP или GIF');
-  if (file.size > 2 * 1024 * 1024) throw new Error('Баннер до 2 МБ');
+  let body = file, type = file.type, ext = file.type.split('/')[1].replace('jpeg', 'jpg');
+  if (file.type === 'image/gif') {
+    // GIF не пережимаем, чтобы не потерять анимацию
+    if (file.size > 2 * 1024 * 1024) throw new Error('GIF-баннер до 2 МБ');
+  } else {
+    // Сжимаем в браузере: длинная сторона до 1600px, WebP/JPEG
+    const { compressImage } = await import('./image.js');
+    const c = await compressImage(file, { maxSide: 1600, quality: 0.85 });
+    body = c.blob; type = c.blob.type; ext = c.ext;
+    if (body.size > 2 * 1024 * 1024) throw new Error('Баннер после сжатия больше 2 МБ');
+  }
+  if (IS_DEMO) return URL.createObjectURL(body);
   const s = await client();
-  const path = `${rnd()}.${file.type.split('/')[1].replace('jpeg', 'jpg')}`;
-  const { error } = await s.storage.from('ads').upload(path, file, { contentType: file.type });
+  const path = `${new Date().toISOString().slice(0, 10)}/${rnd()}.${ext}`;
+  const { error } = await s.storage.from('ads').upload(path, body, { contentType: type, cacheControl: '31536000' });
   if (error) throw new Error(humanError(error));
   return photoUrl(path, 'ads');
 }

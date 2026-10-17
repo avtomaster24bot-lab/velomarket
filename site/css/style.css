@@ -69,6 +69,16 @@ body{overflow-x:hidden}
 .hero{background:radial-gradient(1200px 400px at 85% -10%,rgba(200,245,96,.35),transparent 60%),linear-gradient(135deg,#0b5e4e 0%,#0e7c66 55%,#139a7d 100%);color:#fff;padding:34px 0 44px;position:relative;overflow:hidden}
 .hero::after{content:"";position:absolute;right:-60px;bottom:-40px;width:420px;height:260px;background:url(../assets/demo/bike-mtb.svg) center/contain no-repeat;opacity:.0}
 .hero h1{font-size:28px;font-weight:800;max-width:720px}
+.hero.has-photo{background:#0b2a23}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-bg img{width:100%;height:100%;object-fit:cover;object-position:60% 40%}
+.hero.has-photo::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(6,32,26,.92) 0%,rgba(8,60,48,.72) 45%,rgba(8,60,48,.18) 80%,rgba(0,0,0,.05) 100%),linear-gradient(0deg,rgba(6,25,20,.55),transparent 45%)}
+.hero.has-photo .wrap{position:relative;z-index:2}
+.hero.has-photo h1,.hero.has-photo p{text-shadow:0 2px 14px rgba(0,0,0,.45)}
+.hero-wheel{position:absolute;z-index:1;right:-70px;bottom:-90px;width:260px;height:260px;color:#c8f560;opacity:.07;animation:spin 40s linear infinite;pointer-events:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.hero-wheel{animation:none}}
+@media (max-width:640px){.hero-bg img{object-position:center 35%}.hero.has-photo::before{background:linear-gradient(180deg,rgba(6,32,26,.88) 0%,rgba(8,60,48,.7) 55%,rgba(6,25,20,.85) 100%)}.hero-wheel{width:180px;height:180px;right:-60px;bottom:-60px}}
 .hero p{opacity:.9;max-width:620px;margin:0 0 20px}
 .hero .lime{color:var(--lime)}
 .big-search{display:flex;gap:8px;background:#fff;padding:6px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.18);max-width:760px}
@@ -291,3 +301,5 @@ table.t{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--
 }
 @media (min-width:1150px){ .grid{grid-template-columns:repeat(4,minmax(0,1fr))} .catalog .grid{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.ad-preview{margin:6px 0 14px;max-width:600px;border-radius:12px;overflow:hidden;box-shadow:var(--sh)}.ad-preview img{width:100%;display:block}.ad-preview.side{max-width:180px}
