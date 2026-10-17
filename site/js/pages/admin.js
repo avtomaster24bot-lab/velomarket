@@ -3,10 +3,10 @@ import { $, $$, esc, layout, fmtPrice, timeAgo, toast, brandName, needLogin } fr
 
 const me = await layout('admin');
 const root = $('#admin-root');
-if (needLogin(me)) await new Promise(() => {}); // стоп: страница уже показала сообщение
+if (needLogin(me)) await new Promise(() => {});
 if (!me.is_admin) {
   root.innerHTML = `<div class="empty"><h1>Доступ только для администратора</h1><p>Чтобы стать админом, выполните SQL из README (раздел «Сделать себя админом»).</p></div>`;
-  await new Promise(() => {}); // стоп: страница уже показала сообщение
+  await new Promise(() => {});
 }
 const TABS = { queue: 'Очередь модерации', all: 'Все объявления', reports: 'Жалобы', ads: 'Реклама', brands: 'Бренды', rates: 'Курсы валют' };
 root.innerHTML = `<h1 style="margin-top:18px">Модерация</h1><div class="tabs" id="tabs">${Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}">${v}</button>`).join('')}</div><div id="pane"></div>`;
