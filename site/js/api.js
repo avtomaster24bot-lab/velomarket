@@ -1,7 +1,33 @@
 // Слой данных: Supabase (боевой режим) или демо-данные (если ключи не заданы в config.js)
 import { CONFIG } from './config.js';
 
-export const IS_DEMO = !/^https:\/\/.+/.test(CONFIG.SUPABASE_URL || '') || !CONFIG.SUPABASE_ANON_KEY;
+const HAS_KEYS = /^https:\/\/.+/.test(CONFIG.SUPABASE_URL || '') && !!CONFIG.SUPABASE_ANON_KEY;
+
+// Если ключи есть, но таблицы в базе ещё не созданы (или проект на паузе),
+// сайт не ломается: показывает демо-данные и баннер «Сайт настраивается».
+async function backendReady() {
+  if (!HAS_KEYS) return false;
+  const cacheKey = 'velomarket-backend-ok';
+  try {
+    const c = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+    if (c && Date.now() - c.t < 60000) return c.ok;
+  } catch { /* ignore */ }
+  let ok = false;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/known_brands?select=id&limit=1`, {
+      headers: { apikey: CONFIG.SUPABASE_ANON_KEY, Authorization: `Bearer ${CONFIG.SUPABASE_ANON_KEY}` }, signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    ok = r.ok;
+  } catch { ok = false; }
+  try { sessionStorage.setItem(cacheKey, JSON.stringify({ ok, t: Date.now() })); } catch { /* ignore */ }
+  return ok;
+}
+const READY = await backendReady();
+export const IS_DEMO = !READY;
+export const SETUP_PENDING = HAS_KEYS && !READY;
 export const CATEGORIES = { bike: 'Велосипеды', part: 'Запчасти', accessory: 'Аксессуары' };
 export const BIKE_TYPES = ['горный', 'шоссейный', 'гравийный', 'городской', 'электро', 'BMX', 'детский', 'фэтбайк'];
 export const CONDITIONS = { new: 'Новый', used: 'С пробегом' };
@@ -87,6 +113,7 @@ export async function loginWithTelegram(tgUser) {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
+    if (r.status === 404) throw new Error('Функция входа ещё не установлена в Supabase (telegram-auth). Попробуйте позже.');
     const map = { invalid_hash: 'Подпись Telegram не прошла проверку', auth_expired: 'Данные входа устарели, попробуйте ещё раз',
       too_many_requests: 'Слишком много попыток, подождите минуту', banned: 'Аккаунт заблокирован' };
     throw new Error(map[j.error] || `Ошибка входа (${j.error || r.status})`);

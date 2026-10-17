@@ -88,7 +88,8 @@ export async function layout(active = '') {
   const header = document.createElement('header');
   header.className = 'site-header';
   header.innerHTML = `
-    ${api.IS_DEMO ? `<div class="demo-bar">ДЕМО-режим: все объявления ненастоящие, картинки — иллюстрации. Подключите Supabase в <code>js/config.js</code>.</div>` : ''}
+    ${api.SETUP_PENDING ? `<div class="demo-bar">🔧 Сайт настраивается: база данных подключается. Пока показаны ДЕМО-объявления (ненастоящие).</div>`
+      : api.IS_DEMO ? `<div class="demo-bar">ДЕМО-режим: все объявления ненастоящие, картинки — иллюстрации. Подключите Supabase в <code>js/config.js</code>.</div>` : ''}
     <div class="wrap hdr">
       <a class="logo" href="index.html"><img src="assets/logo.svg" alt="" width="36" height="36"><span>${esc(CONFIG.SITE_NAME)}</span></a>
       <form class="hdr-search" action="list.html"><input name="q" type="search" placeholder="Trek, Giant, вилка Fox…" aria-label="Поиск"><button aria-label="Найти">Найти</button></form>

@@ -14,7 +14,9 @@ if (api.IS_DEMO) {
   box.innerHTML = `<div class="demo-logins" style="width:100%">
     <button class="btn btn-tg" data-role="user">Войти как демо-пользователь</button>
     <button class="btn btn-ghost" data-role="admin">Войти как демо-админ (модерация)</button></div>`;
-  $('#login-msg').innerHTML = 'Сейчас включён демо-режим. Настоящий вход через Telegram заработает, когда в <code>js/config.js</code> будут ключи Supabase и имя бота.';
+  $('#login-msg').innerHTML = api.SETUP_PENDING
+    ? 'Сайт настраивается — вход через Telegram заработает через несколько минут. Пока можно посмотреть демо.'
+    : 'Сейчас включён демо-режим. Настоящий вход через Telegram заработает, когда в <code>js/config.js</code> будут ключи Supabase и имя бота.';
   box.addEventListener('click', (e) => {
     const r = e.target.dataset.role; if (!r) return;
     api.demoLogin(r); location.href = r === 'admin' ? 'admin.html' : next;

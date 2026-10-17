@@ -90,7 +90,8 @@ tests/                    локальные тесты базы (PostgreSQL) и
 ### 4. Развернуть функцию входа
 **Вариант А, через сайт Supabase (без программ):**
 1. **Edge Functions → Deploy a new function → Via Editor**. Назовите функцию ровно `telegram-auth`.
-2. Создайте два файла и вставьте в них содержимое `index.ts` и `telegram.ts` из `supabase/functions/telegram-auth/`. Нажмите Deploy.
+2. Сотрите пример кода в редакторе и вставьте целиком **один файл** `supabase/functions/telegram-auth/single-file.ts`
+   (сырой текст: https://raw.githubusercontent.com/avtomaster24bot-lab/velomarket/main/supabase/functions/telegram-auth/single-file.ts). Нажмите Deploy.
 3. В настройках функции **выключите «Verify JWT» (Enforce JWT verification)**: функцию вызывает ещё не вошедший человек.
 4. **Edge Functions → Secrets → Add new secret**: имя `TELEGRAM_BOT_TOKEN`, значение — токен от BotFather. Вводите его **только здесь**.
 
@@ -111,6 +112,7 @@ SUPABASE_ANON_KEY: 'eyJ…или sb_publishable_…',
 TELEGRAM_BOT_USERNAME: 'VeloMarketKzBot',   // без @
 ```
 Сделайте commit и push в `main`. GitHub Actions сам опубликует сайт за 1–2 минуты. Демо-режим выключится автоматически.
+Если ключи уже вставлены, а таблиц в базе ещё нет (или проект на паузе), сайт не ломается: он показывает баннер «Сайт настраивается» и демо-объявления, а примерно через минуту после создания таблиц сам переключается на настоящие данные.
 
 ### 6. Сделать себя админом
 Войдите на сайт через Telegram один раз, затем в **SQL Editor** выполните:
