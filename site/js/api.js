@@ -108,7 +108,7 @@ export async function getMe() {
 export async function loginWithTelegram(tgUser) {
   if (IS_DEMO) demoOnly();
   const r = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/telegram-auth`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CONFIG.SUPABASE_ANON_KEY },
+    method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CONFIG.SUPABASE_ANON_KEY, Authorization: `Bearer ${CONFIG.SUPABASE_ANON_KEY}` },
     body: JSON.stringify(tgUser),
   });
   const j = await r.json().catch(() => ({}));
