@@ -32,6 +32,12 @@ do $$ begin
 exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: фото с чужим путём запрещено'; end $$;
 insert into public.listing_verification (listing_id, serial_number, serial_photo_path)
 select id, 'WBK123456', :A || '/' || id || '/serial.webp' from listings;
+reset role; update public.profiles set username = null where id = :A;
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+do $$ begin perform public.submit_listing((select id from listings limit 1)); raise exception 'FAIL: подача без username прошла';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: без username в Telegram подать нельзя (%)', left(sqlerrm, 60); end $$;
+reset role; update public.profiles set username = 'seller_a' where id = :A;
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
 select public.submit_listing((select id from listings));
 select pg_temp.check((select status='pending' and cover_path like '%/p1.webp' from listings), 'submit → pending, обложка = первое общее фото');
 do $$ begin update public.listings set status='approved'; raise exception 'FAIL: владелец сам одобрил';
@@ -44,8 +50,8 @@ do $$ begin insert into storage.objects (bucket_id, name) values ('listing-photo
 exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: storage — нельзя писать в чужую папку'; end $$;
 do $$ begin update public.profiles set is_admin = true; raise exception 'FAIL: сделал себя админом';
 exception when insufficient_privilege then raise notice 'ok: нельзя сделать себя админом'; end $$;
-update public.profiles set phone = '+7 701 123 45 67';
-select pg_temp.check((select phone from profiles where id=:A) is not null, 'свой телефон менять можно');
+do $$ begin update public.profiles set first_name = 'X'; raise exception 'FAIL: профиль меняется пользователем';
+exception when insufficient_privilege then raise notice 'ok: пользователь не может менять профиль (только функция входа)'; end $$;
 
 -- ===== B: чужой пользователь =====
 select set_config('request.jwt.claim.sub', :B, false);
@@ -73,7 +79,8 @@ select pg_temp.check((select count(*) from listings)=1, 'гость видит �
 select pg_temp.check((select count(*) from listing_photos)=4, 'гость видит фото одобренного');
 select pg_temp.check((select count(*) from ads where title='off')=0, 'гость не видит неактивную рекламу');
 select pg_temp.check((select username from public.get_seller((select id from listings)))='seller_a', 'get_seller работает');
-select pg_temp.check(public.get_seller_phone((select id from listings)) is not null, 'телефон по кнопке');
+select pg_temp.check(not exists (select 1 from pg_proc where proname = 'get_seller_phone'), 'функции телефона нет');
+select pg_temp.check(not exists (select 1 from information_schema.columns where table_name='profiles' and column_name in ('phone','photo_url','last_name')), 'в profiles нет phone/photo_url/last_name');
 select public.increment_view((select id from listings));
 select pg_temp.check((select views from listings)=1, 'просмотры +1');
 do $$ begin perform count(*) from public.listing_verification; raise exception 'FAIL: гость читает серийники';

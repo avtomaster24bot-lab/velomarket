@@ -4,14 +4,13 @@
 //   hash       = hex(HMAC_SHA256(data_check_string, secret_key))
 //   data_check_string = все поля кроме hash, отсортированы по ключу, "key=value", через "\n"
 
+// Наружу отдаём только то, что храним: id, имя, username.
+// last_name и photo_url Telegram тоже присылает — они нужны ТОЛЬКО для проверки подписи и сразу отбрасываются.
 export interface TelegramUser {
   id: number;
   first_name?: string;
-  last_name?: string;
   username?: string;
-  photo_url?: string;
   auth_date: number;
-  hash: string;
 }
 
 export type VerifyResult =
@@ -78,17 +77,13 @@ export async function verifyTelegramAuth(
   const expected = await computeTelegramHash(clean, botToken);
   if (!timingSafeEqual(expected, hash)) return { ok: false, error: "invalid_hash" };
 
-  const photo = typeof clean.photo_url === "string" && /^https:\/\//.test(clean.photo_url) ? clean.photo_url : undefined;
   return {
     ok: true,
     user: {
       id,
       auth_date: authDate,
-      hash,
-      first_name: clean.first_name !== undefined ? String(clean.first_name) : undefined,
-      last_name: clean.last_name !== undefined ? String(clean.last_name) : undefined,
-      username: clean.username !== undefined ? String(clean.username) : undefined,
-      photo_url: photo,
+      first_name: clean.first_name !== undefined ? String(clean.first_name).slice(0, 64) : undefined,
+      username: clean.username !== undefined ? String(clean.username).slice(0, 64) : undefined,
     },
   };
 }

@@ -35,8 +35,7 @@ if (api.IS_DEMO) {
   s.dataset.telegramLogin = CONFIG.TELEGRAM_BOT_USERNAME;
   s.dataset.size = 'large';
   s.dataset.radius = '12';
-  s.dataset.userpic = 'true';
-  s.dataset.requestAccess = 'write';
+  s.dataset.userpic = 'false';
   s.dataset.onauth = 'onTelegramAuth(user)';
   box.append(s);
 }

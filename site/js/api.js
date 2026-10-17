@@ -128,12 +128,6 @@ export async function logout() {
   if (IS_DEMO) { localStorage.removeItem('velomarket-demo-login'); return; }
   await (await client()).auth.signOut();
 }
-export async function updatePhone(phone) {
-  if (IS_DEMO) demoOnly();
-  const s = await client(); const me = await getMe();
-  must(await s.from('profiles').update({ phone: phone || null }).eq('id', me.id));
-}
-
 // ------------------------------------------------------------------ Справочники
 export async function listBrands() {
   if (IS_DEMO) return (await D()).brands;
@@ -222,10 +216,6 @@ export async function getSeller(id) {
   if (IS_DEMO) { await D(); return demo.listings.find((x) => x.id === +id)?._seller || null; }
   const r = must(await (await client()).rpc('get_seller', { p_listing_id: +id }));
   return r?.[0] || null;
-}
-export async function getSellerPhone(id) {
-  if (IS_DEMO) return '+7 700 000 00 00 (демо)';
-  return must(await (await client()).rpc('get_seller_phone', { p_listing_id: +id }));
 }
 export async function incrementView(id) {
   const key = `vm-viewed-${id}`;
@@ -358,7 +348,7 @@ export async function adminListings(status) {
   if (status) q = q.eq('status', status);
   const rows = must(await q);
   const ids = [...new Set(rows.map((r) => r.user_id))];
-  const profs = ids.length ? must(await s.from('profiles').select('id,tg_id,username,first_name,phone,created_at').in('id', ids)) : [];
+  const profs = ids.length ? must(await s.from('profiles').select('id,tg_id,username,first_name,created_at').in('id', ids)) : [];
   const pm = Object.fromEntries(profs.map((p) => [p.id, p]));
   for (const r of rows) {
     const v = Array.isArray(r.listing_verification) ? r.listing_verification[0] : r.listing_verification;

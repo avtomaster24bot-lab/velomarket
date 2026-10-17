@@ -48,7 +48,6 @@ async function render() {
         <div class="seller" id="seller"></div>
         <div class="actions">
           <a class="btn btn-tg btn-block" id="tg-btn" href="#" target="_blank" rel="noopener">${ICON.tg} Написать продавцу в Telegram</a>
-          <button class="btn btn-ghost btn-block" id="phone-btn">Показать телефон</button>
           <button class="btn btn-ghost btn-block" id="fav-btn">${ICON.heart} В избранное</button>
           ${own ? `<a class="btn btn-primary btn-block" href="new.html?id=${l.id}">Редактировать</a>` : `<button class="btn btn-danger btn-block btn-sm" id="report-btn">Пожаловаться</button>`}
         </div>
@@ -77,7 +76,7 @@ async function render() {
   // продавец
   const seller = await api.getSeller(l.id).catch(() => null);
   if (seller) {
-    $('#seller').innerHTML = `<div class="ava">${seller.photo_url ? `<img src="${esc(seller.photo_url)}" alt="">` : esc((seller.first_name || '?')[0])}</div>
+    $('#seller').innerHTML = `<div class="ava">${esc((seller.first_name || seller.username || '?')[0])}</div>
       <div><b>${esc(seller.first_name || 'Продавец')}</b><small>${seller.username ? '@' + esc(seller.username) + ' · ' : ''}на сайте с ${new Date(seller.member_since).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</small></div>`;
   }
   const tg = $('#tg-btn');
@@ -85,17 +84,9 @@ async function render() {
     tg.href = `https://t.me/${encodeURIComponent(seller.username)}`;
   } else {
     tg.classList.add('btn-ghost'); tg.classList.remove('btn-tg'); tg.removeAttribute('target');
-    tg.innerHTML = 'У продавца нет username в Telegram — звоните по телефону';
+    tg.innerHTML = 'Продавец сейчас недоступен в Telegram';
     tg.onclick = (e) => e.preventDefault();
   }
-  $('#phone-btn').onclick = async (e) => {
-    const b = e.currentTarget; b.disabled = true;
-    try {
-      const ph = await api.getSellerPhone(l.id);
-      if (ph) { b.outerHTML = `<a class="btn btn-primary btn-block" href="tel:${esc(ph.replace(/[^\d+]/g, ''))}">📞 ${esc(ph)}</a>`; }
-      else { b.textContent = 'Продавец не указал телефон'; }
-    } catch (err) { toast(err.message, 'err'); b.disabled = false; }
-  };
   const favs = await api.favoriteIds().catch(() => new Set());
   const fb = $('#fav-btn');
   const syncFav = () => { fb.innerHTML = `${ICON.heart} ${favs.has(l.id) ? 'В избранном' : 'В избранное'}`; fb.style.color = favs.has(l.id) ? '#ff3d68' : ''; };

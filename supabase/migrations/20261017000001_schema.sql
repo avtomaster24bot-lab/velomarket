@@ -9,9 +9,6 @@ create table if not exists public.profiles (
   tg_id       bigint not null unique,
   username    text,
   first_name  text,
-  last_name   text,
-  photo_url   text,
-  phone       text check (phone is null or phone ~ '^\+?[0-9 ()\-]{6,20}$'),
   is_admin    boolean not null default false,
   is_banned   boolean not null default false,
   created_at  timestamptz not null default now(),
@@ -267,6 +264,11 @@ begin
     raise exception 'Объявление не найдено' using errcode = '42501';
   end if;
   if public.is_banned() then raise exception 'Аккаунт заблокирован' using errcode = '42501'; end if;
+  -- связь с продавцом только через Telegram → нужен username
+  if coalesce(btrim((select p.username from public.profiles p where p.id = auth.uid())), '') = '' then
+    raise exception 'Укажите username в настройках Telegram, чтобы покупатели могли вам написать. Затем выйдите и войдите на сайт снова.'
+      using errcode = 'P0001';
+  end if;
   if l.status not in ('draft','rejected','pending','approved') then
     raise exception 'Это объявление нельзя отправить на модерацию (статус %)', l.status;
   end if;
@@ -296,23 +298,17 @@ begin
   perform set_config('velomarket.bypass', 'off', true);
 end $$;
 
--- Публичная карточка продавца (без телефона)
-create or replace function public.get_seller(p_listing_id bigint)
-returns table (username text, first_name text, photo_url text, member_since timestamptz, active_listings bigint)
+-- Публичная карточка продавца: только имя и username Telegram (телефон не храним вообще)
+drop function if exists public.get_seller_phone(bigint);
+drop function if exists public.get_seller(bigint);
+create function public.get_seller(p_listing_id bigint)
+returns table (username text, first_name text, member_since timestamptz, active_listings bigint)
 language sql stable security definer set search_path = public as $$
-  select p.username, p.first_name, p.photo_url, p.created_at,
+  select p.username, p.first_name, p.created_at,
          (select count(*) from public.listings x where x.user_id = p.id and x.status = 'approved')
     from public.listings l join public.profiles p on p.id = l.user_id
    where l.id = p_listing_id
      and (l.status in ('approved','sold') or l.user_id = auth.uid() or public.is_admin());
-$$;
-
--- Телефон продавца — по кнопке «Показать телефон»
-create or replace function public.get_seller_phone(p_listing_id bigint)
-returns text language sql stable security definer set search_path = public as $$
-  select p.phone
-    from public.listings l join public.profiles p on p.id = l.user_id
-   where l.id = p_listing_id and l.status = 'approved';
 $$;
 
 -- Ограничение частоты (вызывает только Edge Function с service_role)

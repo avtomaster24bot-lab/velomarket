@@ -97,7 +97,7 @@ export async function layout(active = '') {
         <a href="list.html?category=bike" class="${active === 'bike' ? 'on' : ''}">Велосипеды</a>
         <a href="list.html?category=part" class="${active === 'part' ? 'on' : ''}">Запчасти</a>
         <a href="favorites.html" class="ico ${active === 'fav' ? 'on' : ''}" title="Избранное">${ICON.heart}<span class="hide-sm">Избранное</span></a>
-        ${me ? `<a href="my.html" class="user ${active === 'my' ? 'on' : ''}">${me.photo_url ? `<img src="${esc(me.photo_url)}" alt="">` : `<i>${esc((me.first_name || '?')[0])}</i>`}<span class="hide-sm">${esc(me.first_name || me.username || 'Кабинет')}</span></a>`
+        ${me ? `<a href="my.html" class="user ${active === 'my' ? 'on' : ''}"><i>${esc((me.first_name || me.username || '?')[0])}</i><span class="hide-sm">${esc(me.first_name || me.username || 'Кабинет')}</span></a>`
              : `<a href="login.html" class="login">${ICON.tg}<span>Войти</span></a>`}
         ${me?.is_admin ? `<a href="admin.html" class="admin-link ${active === 'admin' ? 'on' : ''}">Модерация</a>` : ''}
         <a href="new.html" class="btn btn-accent post">+ Подать<span class="hide-sm"> объявление</span></a>
@@ -108,7 +108,7 @@ export async function layout(active = '') {
   footer.className = 'site-footer';
   footer.innerHTML = `<div class="wrap foot">
     <div><b>${esc(CONFIG.SITE_NAME)}</b><p>${esc(CONFIG.SITE_TAGLINE)}. Каждое объявление проверяет модератор: реплики и подделки не публикуются.</p></div>
-    <div><a href="list.html">Все объявления</a><a href="rules.html">Правила и проверка подлинности</a><a href="new.html">Подать объявление</a></div>
+    <div><a href="list.html">Все объявления</a><a href="rules.html">Правила и проверка подлинности</a><a href="rules.html#data">Какие данные мы храним</a><a href="new.html">Подать объявление</a></div>
     <div><a href="https://t.me/${esc(CONFIG.SUPPORT_TELEGRAM)}" target="_blank" rel="noopener">${ICON.tg} Поддержка и реклама</a><small>© ${new Date().getFullYear()} ${esc(CONFIG.SITE_NAME)}</small></div>
   </div>`;
   document.body.append(footer);

@@ -7,6 +7,7 @@ const root = $('#new-root');
 const editId = Number(params().id) || null;
 if (!api.IS_DEMO && needLogin(me)) throw new Error('login required');
 
+const NO_USERNAME = !api.IS_DEMO && !me?.username;
 const brands = await api.listBrands().catch(() => []);
 let L = null;
 if (editId) {
@@ -21,6 +22,7 @@ root.innerHTML = `
 <h1>${editId ? 'Редактирование объявления' : 'Подать объявление'}</h1>
 ${editId && L.status === 'approved' ? '<p class="warn-box">После сохранения объявление снова пройдёт модерацию.</p>' : ''}
 ${editId && L.rejection_reason ? `<p class="reason">Отклонено модератором: ${esc(L.rejection_reason)}</p>` : ''}
+${NO_USERNAME ? `<div class="reason" style="margin-bottom:14px;padding:14px;font-size:15px"><b>Укажите username в настройках Telegram, чтобы покупатели могли вам написать.</b><br>Telegram → Настройки → Изменить профиль → Имя пользователя. Затем на сайте нажмите «Выйти» в кабинете и войдите снова.</div>` : ''}
 <div class="rules-box" style="margin-bottom:14px"><b>Только оригинал.</b> Запрещены реплики, копии и «ноунейм под бренд». Каждое объявление проверяет модератор по фото и серийному номеру. <a href="rules.html">Правила</a></div>
 <form id="nf" novalidate>
   <div class="panel"><h2><b>1</b> Что продаёте</h2>
@@ -45,7 +47,8 @@ ${editId && L.rejection_reason ? `<p class="reason">Отклонено моде�
       <div class="field"><label for="frame_size">Размер рамы</label><input id="frame_size" name="frame_size" maxlength="20" placeholder='M, L, 54, 19"' value="${esc(L?.frame_size || '')}"></div>
       <div class="field"><label for="wheel_size">Диаметр колёс</label><select id="wheel_size" name="wheel_size"><option value="">—</option>${WHEELS.map((w) => opt(w, w, L?.wheel_size === w)).join('')}</select></div>
     </div>
-    <div class="field"><label for="description">Описание</label><textarea id="description" name="description" maxlength="5000" placeholder="Состояние, что меняли, комплектация, причина продажи, торг…">${esc(L?.description || '')}</textarea></div>
+    <div class="field"><label for="description">Описание</label><textarea id="description" name="description" maxlength="5000" placeholder="Состояние, что меняли, комплектация, причина продажи, торг…">${esc(L?.description || '')}</textarea>
+      <div class="hint">Не пишите телефон, адрес и документы — покупатели напишут вам в Telegram. Если укажете такие данные сами (в тексте или на фото), вы публикуете их добровольно и отвечаете за них; модератор может их удалить. <a href="rules.html#responsibility">Правила</a></div></div>
   </div>
 
   <div class="panel"><h2><b>3</b> Цена и место</h2>
@@ -78,7 +81,7 @@ ${editId && L.rejection_reason ? `<p class="reason">Отклонено моде�
   <div class="panel">
     <label class="check"><input type="checkbox" id="agree" ${editId ? 'checked' : ''}> Подтверждаю, что товар оригинальный, не реплика и не «ноунейм под бренд», номер рамы не перебит, фото сделаны мной.</label>
     <div class="err-text" id="form-err"></div>
-    <button class="btn btn-accent btn-block" style="margin-top:14px" id="submit-btn">${editId ? 'Сохранить и отправить на модерацию' : 'Отправить на модерацию'}</button>
+    <button class="btn btn-accent btn-block" style="margin-top:14px" id="submit-btn"${NO_USERNAME ? ' disabled' : ''}>${editId ? 'Сохранить и отправить на модерацию' : 'Отправить на модерацию'}</button>
     <div class="progress" id="prog" hidden><i></i></div>
     <p class="hint" id="prog-text"></p>
   </div>
@@ -147,6 +150,7 @@ drawThumbs();
 function validate() {
   const f = form;
   const errs = [];
+  if (NO_USERNAME) errs.push('укажите username в настройках Telegram, чтобы покупатели могли вам написать');
   if (!f.brand_id.value) errs.push('выберите бренд');
   if (f.brand_id.value === 'other' && f.brand_other.value.trim().length < 2) errs.push('укажите название бренда');
   if (!f.model.value.trim()) errs.push('укажите модель');

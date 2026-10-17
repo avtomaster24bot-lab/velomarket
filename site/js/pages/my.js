@@ -8,23 +8,15 @@ if (!needLogin(me)) {
   root.innerHTML = `
     ${sent ? `<div class="verified-box" style="margin-bottom:14px"><b>Объявление отправлено на модерацию.</b>&nbsp;Обычно проверка занимает до 24 часов. После одобрения оно появится в каталоге.</div>` : ''}
     <div class="panel profile-card">
-      <div class="seller" style="margin:0;flex:1;min-width:220px"><div class="ava">${me.photo_url ? `<img src="${esc(me.photo_url)}" alt="">` : esc((me.first_name || '?')[0])}</div>
-        <div><b>${esc(me.first_name || '')}</b><small>${me.username ? '@' + esc(me.username) : 'нет username в Telegram — покупатели смогут только позвонить'}</small></div></div>
-      <form id="phone-form" style="display:flex;gap:8px;flex:1;min-width:260px">
-        <input name="phone" type="tel" placeholder="+7 700 000 00 00" value="${esc(me.phone || '')}" aria-label="Телефон">
-        <button class="btn btn-primary">Сохранить</button></form>
+      <div class="seller" style="margin:0;flex:1;min-width:220px"><div class="ava">${esc((me.first_name || me.username || '?')[0])}</div>
+        <div><b>${esc(me.first_name || '')}</b><small>${me.username ? '@' + esc(me.username) + ' · покупатели пишут вам в Telegram' : '⚠ нет username в Telegram'}</small></div></div>
       ${me.is_admin ? '<a class="btn btn-primary btn-sm" href="admin.html">Модерация</a>' : ''}
       <button class="btn btn-ghost btn-sm" id="logout">Выйти</button>
     </div>
+    ${!me.username ? `<div class="reason" style="margin-top:12px;padding:12px">Укажите username в настройках Telegram, чтобы покупатели могли вам написать (Настройки → Изменить профиль → Имя пользователя). Затем нажмите «Выйти» и войдите снова — без username подать объявление нельзя.</div>` : ''}
     <div class="list-top" style="margin-top:20px"><h1>Мои объявления</h1><a class="btn btn-accent" href="new.html">+ Подать объявление</a></div>
     <div id="my-list"><div class="skeleton" style="aspect-ratio:auto;height:96px"></div></div>`;
 
-  $('#phone-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const v = e.target.phone.value.trim();
-    if (v && !/^\+?[0-9 ()\-]{6,20}$/.test(v)) { toast('Телефон: только цифры, пробелы, +, скобки', 'err'); return; }
-    try { await api.updatePhone(v); toast('Телефон сохранён — его увидят по кнопке «Показать телефон»'); } catch (err) { toast(err.message, 'err'); }
-  };
   $('#logout').onclick = async () => { await api.logout(); location.href = 'index.html'; };
 
   async function load() {

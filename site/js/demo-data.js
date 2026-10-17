@@ -25,7 +25,7 @@ const RAW = [
 ];
 const RATES = { KZT: 1, RUB: 6, USD: 520, EUR: 600, UZS: 0.042, KGS: 6, BYN: 160, CNY: 72, GBP: 690, JPY: 3.5 };
 
-export const DEMO_USER = { id: 'demo-user', tg_id: 1, username: 'demo_user', first_name: 'Демо', photo_url: null, phone: '+7 700 000 00 00', is_admin: false };
+export const DEMO_USER = { id: 'demo-user', tg_id: 1, username: 'demo_user', first_name: 'Демо', is_admin: false };
 export const DEMO_ADMIN = { ...DEMO_USER, id: 'demo-admin', username: 'demo_admin', first_name: 'Демо-админ', is_admin: true };
 
 export function buildDemoListings() {
@@ -44,7 +44,7 @@ export function buildDemoListings() {
       rejection_reason: i === 12 ? 'Нет фото серийного номера' : null,
       verified, featured, views: 40 + ((i * 37) % 300), created_at: ago(i * 0.7 + 0.2), published_at: ago(i * 0.7 + 0.1),
       listing_photos: photos, needs_close_review: false,
-      _serial: `DEMO${100000 + i * 7919}`, _seller: { username: 'demo_seller', first_name: 'Демо-продавец', photo_url: null, member_since: ago(200), active_listings: 3 },
+      _serial: `DEMO${100000 + i * 7919}`, _seller: { username: 'demo_seller', first_name: 'Демо-продавец', member_since: ago(200), active_listings: 3 },
     };
   });
 }

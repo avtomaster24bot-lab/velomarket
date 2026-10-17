@@ -40,7 +40,7 @@ assert.equal((await anon.from('listings').select('id').eq('id', id)).data.length
 const q = must(await m.from('listings').select('*, known_brands(name,country), listing_photos(id,path,kind,position), listing_verification(serial_number,serial_photo_path,moderator_note)').eq('status', 'pending').order('updated_at', { ascending: true }).limit(100));
 assert.equal(q.length, 1); assert.equal(q[0].listing_verification.serial_number, 'WTU123'); assert.equal(q[0].listing_photos.length, 4);
 ok('очередь модерации с серийником и фото');
-const profs = must(await m.from('profiles').select('id,tg_id,username,first_name,phone,created_at').in('id', [A]));
+const profs = must(await m.from('profiles').select('id,tg_id,username,first_name,created_at').in('id', [A]));
 assert.equal(profs[0].username, 'seller_a'); ok('админ видит профиль продавца');
 assert.equal((await m.from('listing_verification').select('listing_id, serial_number').ilike('serial_number', 'wtu123')).data.length, 1); ok('поиск дублей серийника');
 must(await m.from('listings').update({ status: 'approved', verified: true, featured: true }).eq('id', id));
@@ -63,7 +63,8 @@ const l = must(await anon.from('listings').select('*, known_brands(name,country)
 assert.equal(l.listing_photos.length, 4); ok('страница объявления + галерея');
 const seller = must(await anon.rpc('get_seller', { p_listing_id: id }));
 assert.equal(seller[0].username, 'seller_a'); assert.equal(seller[0].active_listings, 1); ok('get_seller');
-assert.equal(must(await anon.rpc('get_seller_phone', { p_listing_id: id })), '+7 701 111 22 33'); ok('get_seller_phone');
+assert.deepEqual(Object.keys(seller[0]).sort(), ['active_listings', 'first_name', 'member_since', 'username']); ok('get_seller без фото и телефона');
+assert.ok((await anon.rpc('get_seller_phone', { p_listing_id: id })).error); ok('get_seller_phone удалена');
 must(await anon.rpc('increment_view', { p_id: id }));
 assert.equal(must(await anon.from('listings').select('views').eq('id', id).single()).views, 1); ok('increment_view');
 assert.ok((await anon.from('listing_verification').select('*')).error); ok('гость: listing_verification закрыт');
@@ -81,10 +82,9 @@ assert.match(dup.message, /duplicate key/); ok('повторная жалоба 
 const reps = must(await m.from('reports').select('*, listings(id,title,status)').order('created_at', { ascending: false }));
 assert.equal(reps[0].listings.title, 'Trek Marlin 7'); ok('админ видит жалобы с объявлением');
 
-// мои объявления, продажа, телефон
+// мои объявления, продажа
 const mine = must(await a.from('listings').select(CARD_FIELDS + ',rejection_reason').eq('user_id', A).order('created_at', { ascending: false }));
 assert.equal(mine.length, 2); ok('мои объявления (включая черновик)');
-must(await a.from('profiles').update({ phone: '+7 777 000 11 22' }).eq('id', A)); ok('обновление телефона');
 assert.ok((await a.from('profiles').update({ is_admin: true }).eq('id', A)).error); ok('is_admin через API не меняется');
 must(await a.from('listings').update({ status: 'sold' }).eq('id', id)); ok('отметка «Продано»');
 

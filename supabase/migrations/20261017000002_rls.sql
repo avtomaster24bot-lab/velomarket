@@ -12,17 +12,16 @@ alter table public.ads                  enable row level security;
 alter table public.rate_limits          enable row level security;  -- политик нет: доступ только service_role
 
 -- ---------- profiles ----------
--- Чужие профили напрямую не читаются (данные продавца — через get_seller / get_seller_phone)
+-- Чужие профили напрямую не читаются (имя и username продавца — через get_seller)
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles for select
   using (id = auth.uid() or public.is_admin());
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update
   using (id = auth.uid() or public.is_admin()) with check (id = auth.uid() or public.is_admin());
--- Создание профилей — только Edge Function (service_role). Пользователь может менять лишь телефон.
+-- Создание и обновление профилей — только Edge Function (service_role) при входе.
 revoke insert, update, delete on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
-grant update (phone) on public.profiles to authenticated;
 
 -- ---------- known_brands / currency_rates: читают все, пишет админ ----------
 drop policy if exists brands_read on public.known_brands;
@@ -131,5 +130,4 @@ revoke all on function public.submit_listing(bigint) from public, anon;
 grant execute on function public.submit_listing(bigint) to authenticated;
 grant execute on function public.increment_view(bigint) to anon, authenticated;
 grant execute on function public.get_seller(bigint) to anon, authenticated;
-grant execute on function public.get_seller_phone(bigint) to anon, authenticated;
 grant execute on function public.is_admin() to anon, authenticated;

@@ -83,7 +83,7 @@ function askReason() {
 }
 async function queue() {
   rows = await api.adminListings('pending');
-  pane.innerHTML = rows.length ? `<p class="hint">Сначала самые старые. Сверьте: серийник на фото = указанному, логотип и детали соответствуют бренду, фото не из интернета.</p>` + rows.map((l) => modCard(l, false)).join('')
+  pane.innerHTML = rows.length ? `<p class="hint">Сначала самые старые. Сверьте: серийник на фото = указанному, логотип и детали соответствуют бренду, фото не из интернета.<br><b>Личные данные:</b> если в тексте или на фото есть телефон, адрес, документы — отклоните с просьбой убрать их (контакт только через Telegram).</p>` + rows.map((l) => modCard(l, false)).join('')
     : '<div class="empty"><h2>Очередь пуста 🎉</h2><p>Все объявления проверены.</p></div>';
   bindMod(queue);
 }

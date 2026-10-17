@@ -1,7 +1,9 @@
 // Edge Function: вход через Telegram Login Widget → сессия Supabase Auth.
 //
 // Схема:
-//  1) сайт получает от виджета Telegram объект user {id, first_name, username, photo_url, auth_date, hash};
+//  1) сайт получает от виджета Telegram объект user {id, first_name, username, auth_date, hash, …};
+//     сохраняем ТОЛЬКО tg_id, first_name, username (телефон Telegram сайту не передаёт вообще;
+//     фото и фамилию не храним);
 //  2) POST сюда; проверяем HMAC-SHA256 подпись токеном бота и свежесть auth_date;
 //  3) находим/создаём пользователя Supabase Auth (email tg<id>@<AUTH_EMAIL_DOMAIN>, письма не отправляются);
 //  4) admin.generateLink(magiclink) → hashed_token → verifyOtp → настоящая сессия Supabase
@@ -80,7 +82,7 @@ Deno.serve(async (req) => {
   if (!v.ok) return json({ error: v.error }, v.error === "server_misconfigured" ? 500 : 401, h);
   const tg = v.user;
   const email = `tg${tg.id}@${EMAIL_DOMAIN}`;
-  const meta = { tg_id: tg.id, username: tg.username ?? null, first_name: tg.first_name ?? null, photo_url: tg.photo_url ?? null };
+  const meta = { tg_id: tg.id, username: tg.username ?? null, first_name: tg.first_name ?? null };
 
   // 1. пользователь Supabase Auth: создаём, если ещё нет
   const { data: existing } = await admin.from("profiles").select("id, is_banned").eq("tg_id", tg.id).maybeSingle();
@@ -100,12 +102,12 @@ Deno.serve(async (req) => {
     return json({ error: "link_failed" }, 500, h);
   }
   const userId = link.user.id;
-  await admin.auth.admin.updateUserById(userId, { user_metadata: meta });
+  // user_metadata сливается со старым — явно затираем поля, которые раньше могли сохраниться
+  await admin.auth.admin.updateUserById(userId, { user_metadata: { ...meta, photo_url: null, last_name: null } });
 
-  // 3. профиль (is_admin / phone не трогаем)
+  // 3. профиль: только tg_id, username, first_name (is_admin / is_banned не трогаем)
   const { error: profErr } = await admin.from("profiles").upsert({
     id: userId, tg_id: tg.id, username: tg.username ?? null, first_name: tg.first_name ?? null,
-    last_name: tg.last_name ?? null, photo_url: tg.photo_url ?? null,
   }, { onConflict: "id" });
   if (profErr) {
     console.error("profile", profErr);
@@ -124,6 +126,6 @@ Deno.serve(async (req) => {
     access_token: otp.session.access_token,
     refresh_token: otp.session.refresh_token,
     expires_at: otp.session.expires_at,
-    user: { id: userId, tg_id: tg.id, username: tg.username ?? null, first_name: tg.first_name ?? null, photo_url: tg.photo_url ?? null },
+    user: { id: userId, tg_id: tg.id, username: tg.username ?? null, first_name: tg.first_name ?? null },
   }, 200, h);
 });

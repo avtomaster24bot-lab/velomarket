@@ -26,7 +26,10 @@ Deno.test("data_check_string: сортировка и формат", () => {
 Deno.test("валидная подпись принимается", async () => {
   const r = await verifyTelegramAuth(sample(), TOKEN, { nowSeconds: NOW });
   assert(r.ok, JSON.stringify(r));
-  if (r.ok) { assertEquals(r.user.id, 777000111); assertEquals(r.user.username, "almas_kz"); }
+  if (r.ok) {
+    assertEquals(r.user.id, 777000111); assertEquals(r.user.username, "almas_kz");
+    assertEquals(Object.keys(r.user).sort(), ["auth_date", "first_name", "id", "username"]); // фото/фамилия не выходят наружу
+  }
 });
 Deno.test("валидная подпись без username/photo", async () => {
   const d: Record<string, string | number> = { id: 5, first_name: "Bek", auth_date: NOW };
