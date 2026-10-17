@@ -5,14 +5,14 @@ import { compressImage } from '../image.js';
 const me = await layout();
 const root = $('#new-root');
 const editId = Number(params().id) || null;
-if (!api.IS_DEMO && needLogin(me)) throw new Error('login required');
+if (!api.IS_DEMO && needLogin(me)) await new Promise(() => {}); // стоп: страница уже показала сообщение
 
 const NO_USERNAME = !api.IS_DEMO && !me?.username;
 const brands = await api.listBrands().catch(() => []);
 let L = null;
 if (editId) {
   L = await api.getListingForEdit(editId).catch((e) => { toast(e.message, 'err'); return null; });
-  if (!L || (!api.IS_DEMO && L.user_id !== me.id)) { root.innerHTML = '<div class="empty"><h1>Объявление не найдено</h1></div>'; throw new Error('not found'); }
+  if (!L || (!api.IS_DEMO && L.user_id !== me.id)) { root.innerHTML = '<div class="empty"><h1>Объявление не найдено</h1></div>'; await new Promise(() => {}); // стоп: страница уже показала сообщение }
 }
 const WHEELS = ['12"', '14"', '16"', '18"', '20"', '24"', '26"', '27.5"', '28" / 700c', '29"'];
 const opt = (v, t, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(t ?? v)}</option>`;
