@@ -104,6 +104,14 @@ export async function layout(active = '') {
       </nav>
     </div>`;
   document.body.prepend(header);
+  if (me?._profileError) {
+    const bar = document.createElement('div');
+    bar.className = 'demo-bar';
+    bar.style.cssText = 'background:#fdecec;color:#b42318;border-color:#f3c4c4';
+    bar.innerHTML = `Не удалось загрузить профиль (${esc(me._profileError)}). <button class="btn btn-sm btn-danger" id="bar-logout" style="margin-left:6px">Выйти и войти снова</button>`;
+    header.prepend(bar);
+    bar.querySelector('#bar-logout').onclick = async () => { await api.logout(); location.href = 'login.html'; };
+  }
   const footer = document.createElement('footer');
   footer.className = 'site-footer';
   footer.innerHTML = `<div class="wrap foot">
@@ -114,6 +122,29 @@ export async function layout(active = '') {
   document.body.append(footer);
   document.title = document.title.replace('VeloMarket', CONFIG.SITE_NAME);
   return me;
+}
+
+// Редирект с защитой от петли: не больше 3 переходов за 15 секунд, иначе — сообщение вместо перехода
+export function safeRedirect(url) {
+  const key = 'velomarket-redirects';
+  let log = [];
+  try { log = JSON.parse(sessionStorage.getItem(key) || '[]').filter((t) => Date.now() - t < 15000); } catch { /* ignore */ }
+  if (log.length >= 3) {
+    showFatal('Не удалось открыть страницу автоматически. Нажмите ссылку ниже или выйдите и войдите снова.', url);
+    return false;
+  }
+  log.push(Date.now());
+  try { sessionStorage.setItem(key, JSON.stringify(log)); } catch { /* ignore */ }
+  location.replace(url);
+  return true;
+}
+export function showFatal(msg, link) {
+  const main = document.querySelector('main');
+  if (!main) return;
+  main.innerHTML = `<div class="wrap empty"><h1>Что-то пошло не так</h1><p>${esc(msg)}</p>
+    ${link ? `<p><a class="btn btn-primary" href="${esc(link)}">Продолжить</a></p>` : ''}
+    <p><button class="btn btn-ghost" id="fatal-logout">Выйти из аккаунта</button></p></div>`;
+  document.getElementById('fatal-logout').onclick = async () => { await api.logout(); location.href = 'index.html'; };
 }
 
 export function pager(total, page, size, onGo) {

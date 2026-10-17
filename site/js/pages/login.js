@@ -1,13 +1,19 @@
 import * as api from '../api.js';
 import { CONFIG } from '../config.js';
-import { $, layout, params, toast } from '../ui.js';
+import { $, layout, params, toast, safeRedirect } from '../ui.js';
 
 const me = await layout();
+// Куда вернуть после входа. Пустой next или ссылка на саму login.html → в кабинет (иначе была бесконечная перезагрузка).
 const next = (() => {
-  const n = params().next || '';
-  try { const u = new URL(n, location.href); return u.origin === location.origin ? u.href : 'my.html'; } catch { return 'my.html'; }
+  const n = params().next;
+  if (!n) return 'my.html';
+  try {
+    const u = new URL(n, location.href);
+    if (u.origin !== location.origin || /\/login\.html$/.test(u.pathname)) return 'my.html';
+    return u.href;
+  } catch { return 'my.html'; }
 })();
-if (me) location.replace(next);
+if (me && !me._profileError) { safeRedirect(next); await new Promise(() => {}); }
 
 const box = $('#tg-widget');
 if (api.IS_DEMO) {
@@ -26,7 +32,7 @@ if (api.IS_DEMO) {
 } else {
   window.onTelegramAuth = async (user) => {
     $('#login-msg').textContent = 'Проверяем вход…';
-    try { await api.loginWithTelegram(user); toast('Вы вошли!'); location.replace(next); }
+    try { await api.loginWithTelegram(user); toast('Вы вошли!'); safeRedirect(next); }
     catch (e) { $('#login-msg').textContent = e.message; toast(e.message, 'err'); }
   };
   const s = document.createElement('script');

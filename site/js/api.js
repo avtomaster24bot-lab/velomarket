@@ -97,13 +97,29 @@ function withBrand(l) {
 function demoOnly() { throw new Error('В демо-режиме это действие недоступно — подключите Supabase (см. README)'); }
 
 // ------------------------------------------------------------------ Авторизация
-export async function getMe() {
+// Профиль загружаем один раз за страницу. Никаких перезагрузок/редиректов здесь нет.
+let meP = null;
+export function getMe() {
+  if (!meP) meP = loadMe().catch((e) => ({ id: null, first_name: 'Пользователь', is_admin: false, _profileError: e.message || String(e) }));
+  return meP;
+}
+async function loadMe() {
   if (IS_DEMO) { await D(); return demoMe(); }
   const s = await client();
   const { data: { session } } = await s.auth.getSession();
   if (!session) return null;
-  const { data } = await s.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-  return data || { id: session.user.id, first_name: 'Пользователь', is_admin: false };
+  // только колонки, которые есть в любой версии схемы (до и после миграции 06)
+  const { data, error, status } = await s.from('profiles').select('id,tg_id,username,first_name,is_admin,is_banned,created_at')
+    .eq('id', session.user.id).maybeSingle();
+  if (error) {
+    if (status === 401 || /JWT|token/i.test(error.message)) {   // сессия недействительна → тихо выходим (без перезагрузки)
+      await s.auth.signOut({ scope: 'local' }).catch(() => {});
+      return null;
+    }
+    return { id: session.user.id, first_name: 'Пользователь', is_admin: false, _profileError: error.message };
+  }
+  if (!data) return { id: session.user.id, first_name: 'Пользователь', is_admin: false, _profileError: 'Профиль не найден' };
+  return data;
 }
 export async function loginWithTelegram(tgUser) {
   if (IS_DEMO) demoOnly();
@@ -121,12 +137,16 @@ export async function loginWithTelegram(tgUser) {
   const s = await client();
   const { error } = await s.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
   if (error) throw new Error(humanError(error));
+  meP = null;
   return j.user;
 }
 export function demoLogin(role) { localStorage.setItem('velomarket-demo-login', role); }
 export async function logout() {
+  meP = null;
   if (IS_DEMO) { localStorage.removeItem('velomarket-demo-login'); return; }
-  await (await client()).auth.signOut();
+  const s = await client();
+  await s.auth.signOut({ scope: 'local' }).catch(() => {});
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('velomarket-auth')) localStorage.removeItem(k); } catch { /* ignore */ }
 }
 // ------------------------------------------------------------------ Справочники
 export async function listBrands() {
