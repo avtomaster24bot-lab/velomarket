@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>VeloMarket — велосипеды и запчасти только оригинальных брендов</title>
+<meta name="description" content="Доска объявлений велосипедов и запчастей. Каждое объявление проверяет модератор: реплики не проходят.">
+<meta name="theme-color" content="#0e7c66">
+<meta property="og:title" content="VeloMarket — велосипеды и запчасти только оригинальных брендов">
+<meta property="og:description" content="Доска объявлений велосипедов и запчастей. Каждое объявление проверяет модератор: реплики не проходят.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap&subset=cyrillic" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="home">
+<main id="app">
+<section class="hero"><div class="wrap">
+  <h1>Велосипеды и запчасти. <span class="lime">Только оригинал.</span></h1>
+  <p>Каждое объявление проверяет модератор: серийный номер рамы, фото бренда, реплики и подделки не публикуются.</p>
+  <form class="big-search" action="list.html">
+    <input name="q" type="search" placeholder="Например: Trek Marlin, Giant, вилка Fox 34" aria-label="Что ищете">
+    <select name="category" aria-label="Категория"><option value="">Все категории</option><option value="bike">Велосипеды</option><option value="part">Запчасти</option><option value="accessory">Аксессуары</option></select>
+    <button class="btn btn-accent">Найти</button>
+  </form>
+  <div class="trust"><span data-i="shield"></span></div>
+</div></section>
+<div class="wrap">
+  <div class="cats" id="cats"></div>
+  <section class="block"><div class="ad-slot" id="ad-home-top"></div></section>
+  <section class="block" id="featured-block"><div class="block-head"><h2>Топ-объявления</h2><a href="list.html?featured=1">Все →</a></div><div class="grid" id="featured"></div></section>
+  <section class="block"><div class="block-head"><h2>Свежие объявления</h2><a href="list.html">Смотреть все →</a></div><div class="grid" id="fresh"></div></section>
+  <section class="block"><div class="block-head"><h2>Популярные бренды</h2><a href="list.html">Все бренды в фильтре →</a></div><div class="brands" id="brands"></div></section>
+  <section class="block"><div class="block-head"><h2>Как мы отсекаем подделки</h2><a href="rules.html">Правила →</a></div>
+    <div class="steps">
+      <div class="step"><b>1</b><h3>Серийный номер и фото</h3><p>Продавец загружает фото номера рамы и логотипа. Номер видит только модератор.</p></div>
+      <div class="step"><b>2</b><h3>Ручная модерация</h3><p>Без одобрения объявление не появится. Бренды не из справочника — усиленная проверка.</p></div>
+      <div class="step"><b>3</b><h3>Знак «Проверено»</h3><p>Если подлинность подтверждена — зелёный значок. Нашли реплику? Нажмите «Пожаловаться».</p></div>
+    </div></section>
+</div>
+</main>
+<script type="module" src="js/pages/home.js"></script>
+</body>
+</html>

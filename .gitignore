@@ -1,0 +1,9 @@
+# Секреты никогда не коммитим
+.env
+.env.*
+supabase/.env
+supabase/.temp/
+**/service_role*
+node_modules/
+shots/
+.DS_Store

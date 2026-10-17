@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Объявления — VeloMarket</title>
+<meta name="description" content="Велосипеды, запчасти и аксессуары оригинальных брендов: фильтры по бренду, типу, стране, цене.">
+<meta name="theme-color" content="#0e7c66">
+<meta property="og:title" content="Объявления — VeloMarket">
+<meta property="og:description" content="Велосипеды, запчасти и аксессуары оригинальных брендов: фильтры по бренду, типу, стране, цене.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap&subset=cyrillic" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="list">
+<main id="app">
+<div class="wrap catalog">
+  <aside class="filters" id="filters"><form id="ff">
+    <h3>Фильтры <button type="button" class="drawer-close" id="close-filters" aria-label="Закрыть">×</button></h3>
+    <div class="field"><label for="f-q">Поиск</label><input id="f-q" name="q" type="search" placeholder="Модель, бренд…"></div>
+    <div class="field"><label for="f-category">Категория</label><select id="f-category" name="category"><option value="">Все</option><option value="bike">Велосипеды</option><option value="part">Запчасти</option><option value="accessory">Аксессуары</option></select></div>
+    <div class="field"><label for="f-brand">Бренд</label><select id="f-brand" name="brand"><option value="">Все бренды</option></select></div>
+    <div class="field" id="type-field"><label for="f-type">Тип велосипеда</label><select id="f-type" name="type"><option value="">Любой</option></select></div>
+    <div class="field"><label for="f-country">Страна</label><select id="f-country" name="country"><option value="">Все страны</option></select></div>
+    <div class="field"><label for="f-city">Город</label><input id="f-city" name="city" list="cities" placeholder="Любой"><datalist id="cities"></datalist></div>
+    <div class="field"><label>Цена</label><div class="row"><input name="price_from" type="number" min="0" inputmode="numeric" placeholder="от"><input name="price_to" type="number" min="0" inputmode="numeric" placeholder="до"></div>
+      <select name="currency" style="margin-top:8px" aria-label="Валюта"><option value="">Любая валюта (цена в ₸)</option></select></div>
+    <div class="field"><label>Год</label><div class="row"><input name="year_from" type="number" min="1950" max="2100" placeholder="от"><input name="year_to" type="number" min="1950" max="2100" placeholder="до"></div></div>
+    <div class="field"><label for="f-cond">Состояние</label><select id="f-cond" name="condition"><option value="">Любое</option><option value="new">Новый</option><option value="used">С пробегом</option></select></div>
+    <div class="field"><label class="check"><input type="checkbox" name="verified" value="1"> Только «Проверено»</label></div>
+    <input type="hidden" name="featured">
+    <button class="btn btn-primary btn-block">Показать</button>
+    <button type="reset" class="btn btn-ghost btn-block" style="margin-top:8px" id="reset">Сбросить</button>
+  </form></aside>
+  <section>
+    <div class="list-top"><h1 id="list-title">Все объявления</h1>
+      <div class="tools"><button class="btn btn-ghost btn-sm open-filters" id="open-filters" data-i="filter"> Фильтры</button>
+      <select id="sort" aria-label="Сортировка"><option value="fresh">Сначала новые</option><option value="price_asc">Сначала дешёвые</option><option value="price_desc">Сначала дорогие</option><option value="year_desc">Год: новее</option></select></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="grid" id="results"></div>
+    <div id="pager"></div>
+  </section>
+</div>
+</main>
+<script type="module" src="js/pages/list.js"></script>
+</body>
+</html>

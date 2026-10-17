@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Объявление — VeloMarket</title>
+<meta name="description" content="Объявление о продаже велосипеда или запчасти.">
+<meta name="theme-color" content="#0e7c66">
+<meta property="og:title" content="Объявление — VeloMarket">
+<meta property="og:description" content="Объявление о продаже велосипеда или запчасти.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap&subset=cyrillic" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="listing">
+<main id="app">
+<div class="wrap" id="lst-root"><div class="lst"><div class="skeleton" style="aspect-ratio:4/3"></div><div class="skeleton"></div></div></div>
+<dialog id="report-dlg"><form method="dialog" id="report-form">
+  <h3>Пожаловаться на объявление</h3>
+  <div class="field"><label for="r-reason">Причина</label><select id="r-reason" name="reason" required></select></div>
+  <div class="field"><label for="r-comment">Комментарий (необязательно)</label><textarea id="r-comment" name="comment" maxlength="1000" style="min-height:90px" placeholder="Почему вы считаете, что это реплика или обман?"></textarea></div>
+  <div class="btns"><button value="cancel" class="btn btn-ghost" formnovalidate>Отмена</button><button value="send" class="btn btn-danger">Отправить</button></div>
+</form></dialog>
+</main>
+<script type="module" src="js/pages/listing.js"></script>
+</body>
+</html>

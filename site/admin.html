@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Модерация — VeloMarket</title>
+<meta name="description" content="Панель администратора.">
+<meta name="theme-color" content="#0e7c66">
+<meta property="og:title" content="Модерация — VeloMarket">
+<meta property="og:description" content="Панель администратора.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap&subset=cyrillic" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="admin">
+<main id="app">
+<div class="wrap" style="margin-bottom:40px" id="admin-root"></div>
+<dialog id="reject-dlg"><form method="dialog" id="reject-form">
+  <h3>Отклонить объявление</h3>
+  <div class="field"><label for="rj-preset">Причина</label><select id="rj-preset">
+    <option>Похоже на реплику / подделку</option><option>Нет фото серийного номера или он нечитаем</option>
+    <option>Серийный номер на фото не совпадает с указанным</option><option>Нет фото логотипа / бренда</option>
+    <option>Бренд не соответствует велосипеду («ноунейм под бренд»)</option><option>Фото взяты из интернета</option>
+    <option>Недостаточно фото или плохое качество</option><option>Неверная категория или описание</option><option value="">Другое (напишите ниже)</option></select></div>
+  <div class="field"><label for="rj-text">Комментарий продавцу</label><textarea id="rj-text" maxlength="500" style="min-height:80px"></textarea></div>
+  <div class="btns"><button value="cancel" class="btn btn-ghost" formnovalidate>Отмена</button><button value="ok" class="btn btn-danger">Отклонить</button></div>
+</form></dialog>
+</main>
+<script type="module" src="js/pages/admin.js"></script>
+</body>
+</html>

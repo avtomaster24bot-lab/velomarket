@@ -1,0 +1,5 @@
+# Фрагмент конфигурации Supabase CLI.
+# Если делаете `supabase init`, перенесите блок [functions.telegram-auth] в созданный config.toml.
+[functions.telegram-auth]
+# Функцию вызывает ещё не вошедший пользователь, поэтому JWT не проверяется — проверяется подпись Telegram.
+verify_jwt = false
