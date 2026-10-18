@@ -1,6 +1,6 @@
 import * as api from '../api.js';
 import { CONFIG } from '../config.js';
-import { $, $$, esc, layout, fmtPrice, timeAgo, renderAds, params, ICON, toast, brandName } from '../ui.js';
+import { $, $$, esc, layout, fmtPrice, timeAgo, renderAds, params, ICON, toast, brandName, adSrc } from '../ui.js';
 
 const me = await layout();
 const id = Number(params().id);
@@ -70,7 +70,7 @@ async function render() {
     const th = $('.g-thumbs'); th.hidden = false;
     th.insertAdjacentHTML('beforeend', `<span class="g-thumb-ad" data-i="${N}" title="Реклама">Реклама</span>`);
   }
-  const adHTML = (cls) => `<a class="${cls}" href="${esc(ad.url)}" target="_blank" rel="sponsored noopener" title="${esc(ad.title || 'Реклама')}"><img src="${esc(ad.image_url)}" alt="${esc(ad.title || 'Реклама')}"><span class="ad-label">Реклама</span></a>`;
+  const adHTML = (cls) => `<a class="${cls}" href="${esc(ad.url)}" target="_blank" rel="sponsored noopener" title="${esc(ad.title || 'Реклама')}"><img src="${esc(adSrc(ad.image_url))}" alt="${esc(ad.title || 'Реклама')}"><span class="ad-label">Реклама</span></a>`;
   let cur = 0;
   const show = (i) => {
     cur = (i + total) % total;

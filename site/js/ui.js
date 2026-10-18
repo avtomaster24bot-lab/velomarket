@@ -1,3 +1,4 @@
+export function adSrc(u) { return u && u.startsWith('assets/') ? u + (u.includes('?') ? '&' : '?') + 'v=3' : u; }
 // Общие элементы интерфейса: шапка, подвал, карточки, баннеры, уведомления
 import { CONFIG } from './config.js';
 import * as api from './api.js';
@@ -79,7 +80,7 @@ export async function renderAds(slotEl, slot) {
   const ads = await api.getAds(slot).catch(() => []);
   if (!ads.length) { slotEl.hidden = true; return; }
   slotEl.innerHTML = `<span class="ad-label">Реклама</span>` + ads.map((a, i) =>
-    `<a class="ad${i ? '' : ' on'}" href="${esc(a.url)}" target="_blank" rel="sponsored noopener"><img src="${esc(a.image_url)}" alt="${esc(a.title || 'Реклама')}" loading="lazy"></a>`).join('');
+    `<a class="ad${i ? '' : ' on'}" href="${esc(a.url)}" target="_blank" rel="sponsored noopener"><img src="${esc(adSrc(a.image_url))}" alt="${esc(a.title || 'Реклама')}" loading="lazy"></a>`).join('');
   if (ads.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     let i = 0; const items = $$('.ad', slotEl);
     setInterval(() => { items[i].classList.remove('on'); i = (i + 1) % items.length; items[i].classList.add('on'); }, 6000);
