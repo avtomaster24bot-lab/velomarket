@@ -62,7 +62,7 @@ cv.paste(sc,(1200-sc.width+20,0),m)
 LG2='<linearGradient id="o" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#06140f" stop-opacity=".85"/><stop offset=".5" stop-color="#06140f" stop-opacity=".55"/><stop offset=".68" stop-color="#06140f" stop-opacity="0"/></linearGradient>'
 txt=(f'<text x="56" y="84" {F} font-weight="800" font-size="50" fill="#fff">Здесь может быть</text>'
      f'<text x="56" y="140" {F} font-weight="800" font-size="50" fill="#c8f560">ваша реклама</text>'
-     f'<text x="56" y="196" {F} font-size="30" fill="#fff">пишите в Telegram <tspan font-weight="800">@GrifRift555</tspan></text>')
+     f'<rect x="56" y="164" width="300" height="50" rx="25" fill="#c8f560"/><text x="206" y="198" {F} font-weight="800" font-size="24" fill="#10231c" text-anchor="middle">Заказать рекламу</text>')
 wr('your-ad-wide.svg', svg(1200,240,f'<image width="1200" height="240" xlink:href="data:image/jpeg;base64,{b64(cv,80)}"/><rect width="1200" height="240" fill="url(#o)"/>',txt,LG2))
 # Your ad side 360x600
 bg=cover(emb,360,600,.62,.5)
@@ -71,5 +71,5 @@ txt=(f'<text x="28" y="92" {F} font-weight="800" font-size="38" fill="#fff">Зд
      f'<text x="28" y="138" {F} font-weight="800" font-size="38" fill="#fff">быть ваша</text>'
      f'<text x="28" y="184" {F} font-weight="800" font-size="38" fill="#c8f560">реклама</text>'
      f'<text x="28" y="232" {F} font-size="20" fill="#fff" opacity=".9">Велосервисы, магазины, прокат</text>'
-     f'<rect x="28" y="520" width="304" height="52" rx="26" fill="#c8f560"/><text x="180" y="554" {F} font-weight="800" font-size="22" fill="#10231c" text-anchor="middle">Пишите @GrifRift555</text>')
+     f'<rect x="28" y="520" width="304" height="52" rx="26" fill="#c8f560"/><text x="180" y="554" {F} font-weight="800" font-size="22" fill="#10231c" text-anchor="middle">Заказать рекламу</text>')
 wr('your-ad-side.svg', svg(360,600,f'<image width="360" height="600" xlink:href="data:image/jpeg;base64,{b64(bg,78)}"/><rect width="360" height="600" fill="url(#v)"/>',txt,VG))

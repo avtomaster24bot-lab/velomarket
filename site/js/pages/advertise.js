@@ -29,6 +29,6 @@ $('#adv-root').innerHTML = `
   ${promo.filter((s) => s.code !== 'extra_listing' || settings.free_listing_limit).map((s) => `<tr><td><b>${esc(s.title)}</b></td><td>${esc(s.description)}</td><td>${s.duration_days ? `${s.duration_days} дн.` : 'разово'}</td><td class="p">${fmtKZT(s.price_kzt)}</td></tr>`).join('')}</table></div>
   <div class="panel" style="margin-top:18px"><h2>Как оплатить</h2><ol class="pay-steps" style="font-size:15px">
     <li>Выберите услугу («Мои объявления» → «Продвинуть», или «Заказать в Telegram» выше).</li>
-    <li>Откроется Telegram <b>@${esc(CONFIG.PAY_TELEGRAM || CONFIG.SUPPORT_TELEGRAM)}</b> с готовым сообщением: услуга, номер объявления, цена и номер заказа.</li>
+    <li>Откроется чат с менеджером в Telegram с готовым сообщением: услуга, номер объявления, цена и номер заказа.</li>
     <li>Оплатите Kaspi-переводом по реквизитам, которые пришлёт администратор.</li>
     <li>Администратор включит услугу — вы увидите срок в «Мои объявления».</li></ol></div>`;

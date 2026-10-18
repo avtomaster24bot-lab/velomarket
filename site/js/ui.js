@@ -174,7 +174,7 @@ export async function orderDialog({ service, listing = null, askNote = null }) {
     <p class="hint" style="margin:0 0 10px">${esc(service.description || '')}</p>
     ${listing ? `<p style="margin:0 0 10px">Объявление <b>№ ${listing.id}</b>: ${esc(listing.title)}</p>` : ''}
     ${askNote ? `<div class="field"><label for="od-note">${esc(askNote.label)}</label><input id="od-note" maxlength="${askNote.max || 60}" value="${esc(askNote.value || '')}" placeholder="${esc(askNote.placeholder || '')}" ${askNote.required ? 'required minlength="2"' : ''}></div>` : ''}
-    <ol class="pay-steps"><li>Нажмите «Заказать» — откроется Telegram <b>@${esc(CONFIG.PAY_TELEGRAM || CONFIG.SUPPORT_TELEGRAM)}</b> с готовым сообщением.</li>
+    <ol class="pay-steps"><li>Нажмите «Заказать» — откроется чат с менеджером в Telegram с готовым сообщением.</li>
       <li>Отправьте сообщение и оплатите ${esc(CONFIG.PAY_HOW || 'Kaspi-переводом')}.</li>
       <li>Администратор включит услугу — обычно в течение нескольких часов.</li></ol>
     <div class="od-result" hidden></div>
