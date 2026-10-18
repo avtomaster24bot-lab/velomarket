@@ -10,7 +10,8 @@ const A = 'aaaaaaaa-0000-0000-0000-00000000000a', B = 'bbbbbbbb-0000-0000-0000-0
 const tok = (sub) => jwt.sign(sub ? { sub, role: 'authenticated' } : { role: 'anon' }, SECRET);
 const fetchRewrite = (url, init) => fetch(String(url).replace('http://fake.supabase/rest/v1', PGRST), init);
 const as = (sub) => createClient('http://fake.supabase', 'anon', { accessToken: async () => tok(sub), global: { fetch: fetchRewrite } });
-const CARD_FIELDS = 'id,title,category,brand_id,brand_other,model,year,bike_type,wheel_size,condition,price,currency,price_kzt,country,city,cover_path,verified,featured,status,views,created_at,published_at,known_brands(name,country)';
+const CARD_FIELDS = 'id,title,category,brand_id,brand_other,model,year,bike_type,wheel_size,condition,price,currency,price_kzt,country,city,cover_path,verified,featured,status,views,created_at,published_at,known_brands(name,country)'
+  + ',user_id,expires_at,bumped_at,featured_until,highlight_until,urgent_until,auto_renew_until,shop_until';
 const ok = (m) => console.log('  ok:', m);
 const must = ({ data, error }) => { if (error) throw new Error(JSON.stringify(error)); return data; };
 
@@ -51,7 +52,8 @@ const r = await anon.from('listings').select(CARD_FIELDS, { count: 'exact' }).eq
   .or(`title.ilike.%${qs}%,description.ilike.%${qs}%`).eq('category', 'bike').eq('brand_id', trek).eq('bike_type', 'горный')
   .eq('country', 'Казахстан').ilike('city', '%алм%').eq('condition', 'used').eq('verified', true).gte('year', 2020).lte('year', 2023)
   .gte('price_kzt', 100000).lte('price_kzt', 500000)
-  .order('featured', { ascending: false }).order('published_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).range(0, 23);
+  .gt('expires_at', new Date().toISOString())
+  .order('featured', { ascending: false }).order('bumped_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).range(0, 23);
 must(r); assert.equal(r.count, 1); assert.equal(r.data[0].known_brands.name, 'Trek'); assert.equal(r.data[0].cover_path, `${A}/${id}/general-0.webp`);
 ok(`поиск со всеми фильтрами: найдено ${r.count}, price_kzt=${r.data[0].price_kzt}`);
 const r2 = must(await anon.from('listings').select(CARD_FIELDS, { count: 'exact' }).eq('status', 'approved').eq('currency', 'USD').gte('price', 900));
@@ -63,7 +65,7 @@ const l = must(await anon.from('listings').select('*, known_brands(name,country)
 assert.equal(l.listing_photos.length, 4); ok('страница объявления + галерея');
 const seller = must(await anon.rpc('get_seller', { p_listing_id: id }));
 assert.equal(seller[0].username, 'seller_a'); assert.equal(seller[0].active_listings, 1); ok('get_seller');
-assert.deepEqual(Object.keys(seller[0]).sort(), ['active_listings', 'first_name', 'member_since', 'username']); ok('get_seller без фото и телефона');
+assert.deepEqual(Object.keys(seller[0]).sort(), ['active_listings', 'first_name', 'is_shop', 'member_since', 'shop_name', 'username']); ok('get_seller без фото и телефона (+ магазин)');
 assert.ok((await anon.rpc('get_seller_phone', { p_listing_id: id })).error); ok('get_seller_phone удалена');
 must(await anon.rpc('increment_view', { p_id: id }));
 assert.equal(must(await anon.from('listings').select('views').eq('id', id).single()).views, 1); ok('increment_view');
@@ -86,6 +88,38 @@ assert.equal(reps[0].listings.title, 'Trek Marlin 7'); ok('админ видит
 const mine = must(await a.from('listings').select(CARD_FIELDS + ',rejection_reason').eq('user_id', A).order('created_at', { ascending: false }));
 assert.equal(mine.length, 2); ok('мои объявления (включая черновик)');
 assert.ok((await a.from('profiles').update({ is_admin: true }).eq('id', A)).error); ok('is_admin через API не меняется');
+// ---- миграция 07: услуги, заказы, продление, магазин, очистка (запросы как в api.js)
+const svcs = must(await anon.from('services').select('*').order('sort'));
+assert.ok(svcs.find((x) => x.code === 'top').price_kzt > 0); ok(`услуги и цены читаются гостем: ${svcs.length}`);
+const st = must(await anon.from('app_settings').select('*').eq('id', 1).maybeSingle());
+assert.equal(st.free_listing_limit, null); ok('настройки: лимит выключен');
+assert.ok((await a.from('services').update({ price_kzt: 1 }).eq('code', 'top').select()).data?.length !== 1); ok('пользователь не меняет цены');
+must(await anon.rpc('maintenance_tick', { p_force: false })); ok('maintenance_tick вызывается гостем');
+const oid = must(await a.rpc('create_order', { p_service: 'top', p_listing_id: id, p_note: null }));
+assert.ok(oid > 0); ok(`create_order → заказ № ${oid}`);
+assert.ok((await a.from('service_orders').insert({ user_id: A, service: 'top', price_kzt: 0 })).error); ok('прямой insert заказа запрещён');
+const myo = must(await a.from('service_orders').select('*').eq('user_id', A).order('created_at', { ascending: false }).limit(50));
+assert.equal(myo[0].price_kzt, svcs.find((x) => x.code === 'top').price_kzt); ok('мои заявки с ценой из services');
+assert.equal(must(await b.from('service_orders').select('*')).length, 0); ok('чужие заявки не видны');
+assert.ok((await a.rpc('admin_activate_order', { p_id: oid })).error); ok('владелец не может включить услугу');
+const ao = must(await m.from('service_orders').select('*, listings(id,title,status,featured_until,highlight_until,urgent_until,auto_renew_until,expires_at)').eq('status', 'requested').order('created_at', { ascending: false }).limit(200));
+assert.equal(ao[0].listings.id, id); ok('админ: заказы с объявлением');
+must(await m.rpc('admin_activate_order', { p_id: oid }));
+const after = must(await anon.from('listings').select(CARD_FIELDS).eq('id', id).single());
+assert.ok(after.featured && new Date(after.featured_until) > new Date()); ok('«Оплачено, включить» → Топ включён');
+const shopOid = must(await a.rpc('create_order', { p_service: 'shop', p_listing_id: null, p_note: 'Velo A' }));
+must(await m.rpc('admin_activate_order', { p_id: shopOid }));
+const shop = must(await anon.rpc('get_shop', { p_username: 'seller_a' }))[0];
+assert.equal(shop.shop_name, 'Velo A'); assert.equal(shop.is_shop, true); ok('get_shop: магазин');
+const shopList = must(await anon.from('listings').select(CARD_FIELDS, { count: 'exact' }).eq('status', 'approved').gt('expires_at', new Date().toISOString()).eq('user_id', shop.user_id));
+assert.equal(shopList.length, 1); assert.ok(new Date(shopList[0].shop_until) > new Date()); ok('страница магазина: объявления + значок');
+assert.ok((await a.rpc('renew_listing', { p_id: id })).error); ok('продлить рано — ошибка');
+must(await m.from('app_settings').update({ free_listing_limit: 5 }).eq('id', 1));
+must(await m.from('app_settings').update({ free_listing_limit: null }).eq('id', 1)); ok('админ меняет настройки');
+assert.ok(Array.isArray(must(await m.rpc('admin_cleanup_candidates', { p_limit: 100 })))); ok('admin_cleanup_candidates');
+assert.ok((await a.rpc('admin_cleanup_candidates', { p_limit: 100 })).error); ok('очистка недоступна пользователю');
+const gal = must(await anon.from('ads').select('id,slot,title,image_url,url,position').eq('slot', 'gallery_end').eq('active', true).order('position'));
+assert.equal(gal.length, 2); ok('баннеры gallery_end');
 must(await a.from('listings').update({ status: 'sold' }).eq('id', id)); ok('отметка «Продано»');
 
 // реклама и курсы

@@ -6,6 +6,7 @@ const b = (name) => BRANDS.find((x) => x.name === name)?.id ?? null;
 const img = (n) => `assets/demo/${n}.svg`;
 const day = 86400000;
 const ago = (d) => new Date(Date.now() - d * day).toISOString();
+const inDays = (d) => new Date(Date.now() + d * day).toISOString();
 
 const RAW = [
   ['bike', 'Trek', 'Marlin 7 (демо)', 2022, 'горный', 'L', '29"', 'used', 420000, 'KZT', 'Казахстан', 'Алматы', 'bike-mtb', true, true],
@@ -44,9 +45,29 @@ export function buildDemoListings() {
       rejection_reason: i === 12 ? 'Нет фото серийного номера' : null,
       verified, featured, views: 40 + ((i * 37) % 300), created_at: ago(i * 0.7 + 0.2), published_at: ago(i * 0.7 + 0.1),
       listing_photos: photos, needs_close_review: false,
+      bumped_at: ago(i * 0.7 + 0.1), expires_at: inDays(30 - i * 0.7),
+      featured_until: featured ? inDays(5) : null,
+      urgent_until: i === 3 || i === 10 ? inDays(4) : null,
+      highlight_until: i === 1 || i === 6 ? inDays(6) : null,
+      auto_renew_until: i === 0 ? inDays(21) : null,
+      shop_until: i % 3 !== 0 && i % 2 === 1 ? inDays(20) : null,
       _serial: `DEMO${100000 + i * 7919}`, _seller: { username: 'demo_seller', first_name: 'Демо-продавец', member_since: ago(200), active_listings: 3 },
     };
   });
+}
+// Демо: у demo_user одно объявление с истёкшим сроком и одно проданное давно (для очистки)
+export function patchDemoListings(list) {
+  const e = list.find((l) => l.id === 1009); if (e) Object.assign(e, { user_id: 'demo-user', status: 'expired', expires_at: ago(2), featured: false, featured_until: null });
+  const s = list.find((l) => l.id === 1012); if (s) Object.assign(s, { status: 'sold', sold_at: ago(45) });
+  return list;
+}
+export function buildDemoOrders() {
+  return [
+    { id: 101, user_id: 'demo-user', listing_id: 1003, service: 'top', price_kzt: 1500, days: 7, note: null, status: 'requested', created_at: ago(0.05) },
+    { id: 102, user_id: 'demo-seller', listing_id: 1004, service: 'highlight', price_kzt: 700, days: 7, note: null, status: 'requested', created_at: ago(0.3) },
+    { id: 103, user_id: 'demo-seller', listing_id: null, service: 'shop', price_kzt: 5000, days: 30, note: 'ВелоДемо Алматы', status: 'requested', created_at: ago(0.6) },
+    { id: 100, user_id: 'demo-user', listing_id: 1000, service: 'auto_renew', price_kzt: 2000, days: 30, note: null, status: 'active', created_at: ago(9), paid_at: ago(9), activated_at: ago(9) },
+  ];
 }
 export const DEMO_RATES = Object.entries(RATES).map(([code, rate_to_kzt]) => ({ code, rate_to_kzt }));
 export const DEMO_ADS = [
@@ -54,4 +75,6 @@ export const DEMO_ADS = [
   { id: 2, slot: 'home_top', title: 'Ваша реклама', image_url: 'assets/ads/your-ad-wide.svg', url: 'https://t.me/GrifRift555', active: true, position: 2 },
   { id: 3, slot: 'list_inline', title: 'Чек-лист', image_url: 'assets/ads/checklist-inline.svg', url: 'https://avtomaster24bot-lab.github.io/bike-checklist/', active: true, position: 1 },
   { id: 4, slot: 'listing_side', title: 'Ваша реклама', image_url: 'assets/ads/your-ad-side.svg', url: 'https://t.me/GrifRift555', active: true, position: 1 },
+  { id: 5, slot: 'gallery_end', title: 'Velopark.kz — японские электровелосипеды Panasonic', image_url: 'assets/ads/velopark-gallery.svg', url: 'https://avtomaster24bot-lab.github.io/velopark-panasonic/', active: true, position: 1 },
+  { id: 6, slot: 'gallery_end', title: 'Здесь может быть ваша реклама', image_url: 'assets/ads/your-ad-gallery.svg', url: 'https://t.me/GrifRift555', active: true, position: 2 },
 ];

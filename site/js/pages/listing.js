@@ -8,7 +8,7 @@ const root = $('#lst-root');
 let l = null;
 try { l = id ? await api.getListing(id) : null; } catch (e) { toast(e.message, 'err'); }
 if (!l) {
-  root.innerHTML = `<div class="empty"><h1>Объявление не найдено</h1><p>Возможно, оно снято с продажи или ещё на модерации.</p><a class="btn btn-primary" href="list.html">Все объявления</a></div>`;
+  root.innerHTML = `<div class="empty"><h1>Объявление не найдено</h1><p>Возможно, оно продано и снято, у него закончился срок показа или оно ещё на модерации.</p><a class="btn btn-primary" href="list.html">Все объявления</a></div>`;
 } else render();
 
 async function render() {
@@ -20,7 +20,10 @@ async function render() {
     ['Модель', l.model], ['Год', l.year], ['Тип', l.bike_type], ['Размер рамы', l.frame_size], ['Колёса', l.wheel_size],
     ['Состояние', api.CONDITIONS[l.condition]], ['Город', `${l.city}, ${l.country}`],
   ].filter(([, v]) => v);
-  const statusNote = l.status !== 'approved' ? `<div class="warn-box" style="margin-bottom:12px">Статус: <b>${api.STATUSES[l.status]}</b>${l.rejection_reason ? ` — ${esc(l.rejection_reason)}` : ''}. ${l.status === 'sold' ? '' : 'Покупатели пока не видят это объявление.'}</div>` : '';
+  const expired = l.status === 'expired' || (l.status === 'approved' && l.expires_at && !api.isOn(l.expires_at));
+  const statusNote = expired ? `<div class="warn-box" style="margin-bottom:12px">Срок показа истёк — покупатели не видят объявление. ${own ? '<a href="my.html">Продлить бесплатно в «Мои объявления»</a>' : ''}</div>`
+    : l.status !== 'approved' ? `<div class="warn-box" style="margin-bottom:12px">Статус: <b>${api.STATUSES[l.status]}</b>${l.rejection_reason ? ` — ${esc(l.rejection_reason)}` : ''}. ${l.status === 'sold' ? '' : 'Покупатели пока не видят это объявление.'}</div>` : '';
+  const top = l.featured && (!l.featured_until || api.isOn(l.featured_until));
 
   root.innerHTML = `
   <div class="crumbs"><a href="index.html">Главная</a> › <a href="list.html?category=${l.category}">${api.CATEGORIES[l.category]}</a>${l.brand_id ? ` › <a href="list.html?brand=${l.brand_id}">${esc(brandName(l))}</a>` : ''}</div>
@@ -28,9 +31,9 @@ async function render() {
     <div>
       <div class="gallery">
         <div class="g-main" id="g-main"><img id="g-img" src="${esc(api.photoUrl(photos[0].path))}" alt="${esc(l.title)}">
-          ${photos.length > 1 ? '<button class="g-nav g-prev" aria-label="Назад">‹</button><button class="g-nav g-next" aria-label="Вперёд">›</button>' : ''}
+          <button class="g-nav g-prev" aria-label="Назад"${photos.length > 1 ? '' : ' hidden'}>‹</button><button class="g-nav g-next" aria-label="Вперёд"${photos.length > 1 ? '' : ' hidden'}>›</button>
           <span class="g-count" id="g-count">1 / ${photos.length}</span></div>
-        ${photos.length > 1 ? `<div class="g-thumbs">${photos.map((p, i) => `<img src="${esc(api.photoUrl(p.path))}" data-i="${i}" class="${i ? '' : 'on'}" alt="" loading="lazy">`).join('')}</div>` : ''}
+        <div class="g-thumbs"${photos.length > 1 ? '' : ' hidden'}>${photos.map((p, i) => `<img src="${esc(api.photoUrl(p.path))}" data-i="${i}" class="${i ? '' : 'on'}" alt="" loading="lazy">`).join('')}</div>
       </div>
       <div class="panel" style="margin-top:14px"><h2>Характеристики</h2>
         <dl class="specs">${spec.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div>
@@ -40,7 +43,7 @@ async function render() {
     <aside>
       <div class="panel">
         ${statusNote}
-        <div class="badges" style="position:static;margin-bottom:6px">${l.featured ? `<span class="badge hot">${ICON.star} Топ</span>` : ''}${l.condition === 'new' ? '<span class="badge new">Новый</span>' : ''}${l.status === 'sold' ? '<span class="badge sold">Продано</span>' : ''}</div>
+        <div class="badges" style="position:static;margin-bottom:6px">${top ? `<span class="badge hot">${ICON.star} Топ</span>` : ''}${api.isOn(l.urgent_until) ? '<span class="badge urgent">⚡ Срочно</span>' : ''}${api.isOn(l.shop_until) ? '<span class="badge shop">🏪 Магазин</span>' : ''}${l.condition === 'new' ? '<span class="badge new">Новый</span>' : ''}${l.status === 'sold' ? '<span class="badge sold">Продано</span>' : ''}</div>
         <h1 class="l-title">${esc(l.title)}</h1>
         <div class="l-price">${fmtPrice(l.price, l.currency)}${l.currency !== 'KZT' ? `<small>≈ ${fmtPrice(l.price_kzt, 'KZT')} по курсу площадки</small>` : ''}</div>
         ${l.verified ? `<div class="verified-box">${ICON.shield}<div><b>Проверено модератором</b><br>Серийный номер и фото бренда сверены.</div></div>`
@@ -57,27 +60,68 @@ async function render() {
     </aside>
   </div>`;
 
-  // галерея
+  // галерея: фото + (если есть) последний слайд — реклама gallery_end (случайная из активных)
+  const ads = await api.getAds('gallery_end').catch(() => []);
+  const ad = ads.length ? ads[Math.floor(Math.random() * ads.length)] : null;
+  const N = photos.length, total = N + (ad ? 1 : 0);
+  const main = $('#g-main');
+  if (ad) {
+    $('.g-prev').hidden = false; $('.g-next').hidden = false;
+    const th = $('.g-thumbs'); th.hidden = false;
+    th.insertAdjacentHTML('beforeend', `<span class="g-thumb-ad" data-i="${N}" title="Реклама">Реклама</span>`);
+  }
+  const adHTML = (cls) => `<a class="${cls}" href="${esc(ad.url)}" target="_blank" rel="sponsored noopener" title="${esc(ad.title || 'Реклама')}"><img src="${esc(ad.image_url)}" alt="${esc(ad.title || 'Реклама')}"><span class="ad-label">Реклама</span></a>`;
   let cur = 0;
-  const show = (i) => { cur = (i + photos.length) % photos.length; $('#g-img').src = api.photoUrl(photos[cur].path); $('#g-count').textContent = `${cur + 1} / ${photos.length}`; $$('.g-thumbs img').forEach((t, j) => t.classList.toggle('on', j === cur)); };
-  $('.g-prev')?.addEventListener('click', (e) => { e.stopPropagation(); show(cur - 1); });
-  $('.g-next')?.addEventListener('click', (e) => { e.stopPropagation(); show(cur + 1); });
-  $('.g-thumbs')?.addEventListener('click', (e) => { if (e.target.dataset.i) show(+e.target.dataset.i); });
-  let x0 = null;
-  $('#g-main').addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
-  $('#g-main').addEventListener('touchend', (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1)); x0 = null; });
-  $('#g-main').addEventListener('click', () => {
-    const lb = document.createElement('div'); lb.className = 'lightbox';
-    lb.innerHTML = `<img src="${esc(api.photoUrl(photos[cur].path))}" alt=""><button aria-label="Закрыть">×</button>`;
-    lb.onclick = () => lb.remove(); document.body.append(lb);
+  const show = (i) => {
+    cur = (i + total) % total;
+    main.querySelector('.g-ad')?.remove();
+    if (ad && cur === N) { main.insertAdjacentHTML('beforeend', adHTML('g-ad')); $('#g-count').hidden = true; }
+    else { $('#g-img').src = api.photoUrl(photos[cur].path); $('#g-count').hidden = false; $('#g-count').textContent = `${cur + 1} / ${N}`; }
+    main.querySelector('.g-ad') && main.append(...main.querySelectorAll('.g-nav, .g-count'));   // стрелки поверх рекламы
+    $$('.g-thumbs [data-i]').forEach((t) => t.classList.toggle('on', +t.dataset.i === cur));
+  };
+  $('.g-prev').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); show(cur - 1); });
+  $('.g-next').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); show(cur + 1); });
+  $('.g-thumbs').addEventListener('click', (e) => { const t = e.target.closest('[data-i]'); if (t) show(+t.dataset.i); });
+  const swipe = (el, go) => {
+    let x0 = null;
+    el.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    el.addEventListener('touchend', (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 40) { el.dataset.swiped = '1'; setTimeout(() => delete el.dataset.swiped, 350); go(dx < 0 ? 1 : -1); } });
+    el.addEventListener('click', (e) => { if (el.dataset.swiped) { e.preventDefault(); e.stopPropagation(); } }, true);
+  };
+  swipe(main, (d) => show(cur + d));
+  // полноэкранный просмотр с листанием (реклама — тоже последним слайдом)
+  let lb = null;
+  const lbRender = () => {
+    const isAd = ad && cur === N;
+    lb.querySelector('.lb-body').innerHTML = isAd ? adHTML('lb-ad') : `<img src="${esc(api.photoUrl(photos[cur].path))}" alt="">`;
+    lb.querySelector('.lb-count').textContent = isAd ? 'Реклама' : `${cur + 1} / ${N}`;
+  };
+  main.addEventListener('click', (e) => {
+    if (e.target.closest('.g-ad, .g-nav')) return;
+    lb = document.createElement('div'); lb.className = 'lightbox';
+    lb.innerHTML = `<div class="lb-body"></div>${total > 1 ? '<button class="lb-nav lb-prev" aria-label="Назад">‹</button><button class="lb-nav lb-next" aria-label="Вперёд">›</button>' : ''}<span class="lb-count"></span><button class="lb-close" aria-label="Закрыть">×</button>`;
+    lb.onclick = (ev) => {
+      if (ev.target.closest('.lb-prev')) { show(cur - 1); lbRender(); return; }
+      if (ev.target.closest('.lb-next')) { show(cur + 1); lbRender(); return; }
+      if (ev.target.closest('a.lb-ad')) return;      // клик по рекламе — переход по ссылке
+      lb.remove(); lb = null;
+    };
+    swipe(lb, (d) => { show(cur + d); lbRender(); });
+    document.body.append(lb); lbRender();
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') show(cur - 1); if (e.key === 'ArrowRight') show(cur + 1); if (e.key === 'Escape') $('.lightbox')?.remove(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { show(cur - 1); if (lb) lbRender(); }
+    if (e.key === 'ArrowRight') { show(cur + 1); if (lb) lbRender(); }
+    if (e.key === 'Escape' && lb) { lb.remove(); lb = null; }
+  });
 
   // продавец
   const seller = await api.getSeller(l.id).catch(() => null);
   if (seller) {
     $('#seller').innerHTML = `<div class="ava">${esc((seller.first_name || seller.username || '?')[0])}</div>
-      <div><b>${esc(seller.first_name || 'Продавец')}</b><small>${seller.username ? '@' + esc(seller.username) + ' · ' : ''}на сайте с ${new Date(seller.member_since).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</small></div>`;
+      <div><b>${seller.is_shop && seller.shop_name ? `🏪 ${esc(seller.shop_name)}` : esc(seller.first_name || 'Продавец')}</b><small>${seller.username ? '@' + esc(seller.username) + ' · ' : ''}на сайте с ${new Date(seller.member_since).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</small>
+        ${api.V2 && seller.username ? `<a class="seller-all" href="shop.html?u=${encodeURIComponent(seller.username)}">${seller.is_shop ? 'Все объявления магазина' : 'Все объявления продавца'}${seller.active_listings ? ` (${seller.active_listings})` : ''} →</a>` : ''}</div>`;
   }
   const tg = $('#tg-btn');
   if (seller?.username) {

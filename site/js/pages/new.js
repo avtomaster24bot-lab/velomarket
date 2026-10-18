@@ -20,7 +20,7 @@ const year = new Date().getFullYear();
 
 root.innerHTML = `
 <h1>${editId ? 'Редактирование объявления' : 'Подать объявление'}</h1>
-${editId && L.status === 'approved' ? '<p class="warn-box">После сохранения объявление снова пройдёт модерацию.</p>' : ''}
+${editId && ['approved', 'expired'].includes(L.status) ? '<p class="warn-box">После сохранения объявление снова пройдёт модерацию.</p>' : ''}
 ${editId && L.rejection_reason ? `<p class="reason">Отклонено модератором: ${esc(L.rejection_reason)}</p>` : ''}
 ${NO_USERNAME ? `<div class="reason" style="margin-bottom:14px;padding:14px;font-size:15px"><b>Укажите username в настройках Telegram, чтобы покупатели могли вам написать.</b><br>Telegram → Настройки → Изменить профиль → Имя пользователя. Затем на сайте нажмите «Выйти» в кабинете и войдите снова.</div>` : ''}
 <div class="rules-box" style="margin-bottom:14px"><b>Только оригинал.</b> Запрещены реплики, копии и «ноунейм под бренд». Каждое объявление проверяет модератор по фото и серийному номеру. <a href="rules.html">Правила</a></div>

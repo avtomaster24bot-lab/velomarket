@@ -116,4 +116,132 @@ reset role;
 select pg_temp.check((select count(*) from known_brands) > 150, 'справочник брендов загружен');
 update public.currency_rates set rate_to_kzt = 500 where code = 'USD';
 select pg_temp.check((select price_kzt from listings)=500000, 'смена курса USD пересчитала price_kzt');
+
+-- ===================== Монетизация, сроки, очистка (миграция 07) =====================
+reset role;
+select pg_temp.check((select count(*) from services where kind='listing') >= 5, 'услуги и цены загружены');
+select pg_temp.check((select free_listing_limit is null from app_settings), 'лимит бесплатных объявлений по умолчанию выключен');
+select pg_temp.check((select count(*) from ads where slot='gallery_end') = 2, 'реклама gallery_end засеяна');
+-- два опубликованных объявления A (как будто одобрены): L1 старше, L2 новее
+insert into listings (user_id, category, brand_id, model, condition, price, country, city, status, published_at, bumped_at, expires_at)
+values (:A,'bike',(select id from known_brands where name='Trek'),'L1','used',100,'Казахстан','Алматы','approved', now()-interval '5 days', now()-interval '5 days', now()+interval '25 days'),
+       (:A,'bike',(select id from known_brands where name='Trek'),'L2','used',200,'Казахстан','Алматы','approved', now()-interval '1 day', now()-interval '1 day', now()+interval '29 days');
+create temp table ids as select (select id from listings where model='L1') l1, (select id from listings where model='L2') l2;
+grant select on ids to public;
+
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+update listings set featured_until = now()+interval '1 year', highlight_until = now()+interval '1 year', urgent_until = now()+interval '1 year',
+  auto_renew_until = now()+interval '1 year', expires_at = now()+interval '5 years', bumped_at = now()+interval '1 day', paid_slot_until = now()+interval '1 year', featured = true
+ where model in ('L1','L2');
+select pg_temp.check((select bool_and(featured_until is null and highlight_until is null and urgent_until is null and auto_renew_until is null
+  and paid_slot_until is null and not featured and expires_at < now()+interval '31 days' and bumped_at < now()) from listings where model in ('L1','L2')),
+  'владелец НЕ может сам включить Топ/цвет/Срочно/автопродление/срок/поднятие');
+do $$ begin insert into service_orders (user_id, listing_id, service, price_kzt) values (auth.uid(), (select l1 from ids), 'top', 0);
+  raise exception 'FAIL: заказ вставлен напрямую с ценой 0';
+exception when insufficient_privilege then raise notice 'ok: заказ напрямую (со своей ценой) создать нельзя'; end $$;
+select public.create_order('top', (select l1 from ids));
+select pg_temp.check((select price_kzt=1500 and status='requested' and days=7 from service_orders where service='top'), 'create_order: цена и срок берутся из services');
+select pg_temp.check(public.create_order('top', (select l1 from ids)) = (select id from service_orders where service='top'), 'повторный заказ той же услуги → тот же номер');
+do $$ begin perform public.admin_activate_order((select id from service_orders limit 1)); raise exception 'FAIL: владелец включил услугу';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: владелец не может включить услугу (%)', sqlerrm; end $$;
+do $$ begin update service_orders set status='active'; if exists (select 1 from service_orders where status='active') then raise exception 'FAIL: владелец сменил статус заказа'; end if;
+  raise notice 'ok: владелец не может сменить статус заказа'; end $$;
+select set_config('request.jwt.claim.sub', :B, false);
+select pg_temp.check((select count(*) from service_orders)=0, 'чужие заказы не видны');
+do $$ begin perform public.create_order('top', (select l1 from ids)); raise exception 'FAIL: B заказал услугу на чужое объявление';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: услугу на чужое объявление заказать нельзя'; end $$;
+
+-- админ: «Оплачено, включить»
+select set_config('request.jwt.claim.sub', :M, false);
+select public.admin_activate_order((select id from service_orders where service='top'));
+select pg_temp.check((select featured and featured_until > now()+interval '6 days' from listings where id=(select l1 from ids)), 'админ включил Топ на 7 дней');
+select pg_temp.check((select status='active' and activated_at is not null from service_orders where service='top'), 'заказ → active');
+-- сортировка каталога: Топ первым, затем по bumped_at
+reset role; set role anon; select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((select array_agg(model order by featured desc, bumped_at desc nulls last, id desc) from listings where status='approved') = array['L1','L2'], 'сортировка: Топ (L1) выше свежего L2');
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+select public.create_order('bump', (select l2 from ids));
+select public.create_order('highlight', (select l2 from ids));
+select set_config('request.jwt.claim.sub', :M, false);
+select public.admin_activate_order((select id from service_orders where service='bump'));
+select public.admin_activate_order((select id from service_orders where service='highlight'));
+select pg_temp.check((select bumped_at > now()-interval '1 minute' and highlight_until > now() from listings where id=(select l2 from ids)), 'Поднять + Выделить включены');
+-- Топ истёк → tick снимает
+reset role; update listings set featured_until = now()-interval '1 minute' where id=(select l1 from ids);
+select public.maintenance_tick(true);
+select pg_temp.check((select not featured from listings where id=(select l1 from ids)), 'tick: истёкший Топ снят');
+reset role; set role anon; select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((select array_agg(model order by featured desc, bumped_at desc nulls last, id desc) from listings where status='approved') = array['L2','L1'], 'сортировка: поднятое L2 теперь выше');
+
+-- срок истёк: скрыто сразу (RLS), потом tick → expired
+reset role; update listings set expires_at = now()-interval '1 hour' where id=(select l2 from ids);
+set role anon; select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((select count(*) from listings where model='L2')=0, 'истёкшее скрыто от гостей сразу (ещё до tick)');
+reset role; select public.maintenance_tick(true);
+reset role; select pg_temp.check((select status='expired' from listings where id=(select l2 from ids)), 'tick: approved → expired');
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+select pg_temp.check((select count(*) from listings where model='L2')=1, 'владелец видит своё истёкшее');
+do $$ begin perform public.renew_listing((select l1 from ids)); raise exception 'FAIL: продлили слишком рано';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: продлить рано нельзя (%)', sqlerrm; end $$;
+select public.renew_listing((select l2 from ids));
+select pg_temp.check((select status='approved' and expires_at > now()+interval '29 days' and renewed_at is not null from listings where id=(select l2 from ids)), 'бесплатное продление +30 дней');
+select set_config('request.jwt.claim.sub', :B, false);
+do $$ begin perform public.renew_listing((select l2 from ids)); raise exception 'FAIL: B продлил чужое';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: чужое продлить нельзя'; end $$;
+
+-- автопродление: не истекает и поднимается
+select set_config('request.jwt.claim.sub', :A, false);
+select public.create_order('auto_renew', (select l1 from ids));
+select set_config('request.jwt.claim.sub', :M, false);
+select public.admin_activate_order((select id from service_orders where service='auto_renew'));
+reset role;
+update listings set bumped_at = now()-interval '10 days', expires_at = now()+interval '1 day' where id=(select l1 from ids);
+select public.maintenance_tick(true);
+select pg_temp.check((select status='approved' and expires_at > now()+interval '29 days' and bumped_at > now()-interval '1 minute' from listings where id=(select l1 from ids)), 'автопродление: срок продлён и объявление поднято');
+
+-- Магазин
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+do $$ begin perform public.create_order('shop', null, ''); raise exception 'FAIL: магазин без названия';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: магазин без названия не заказать'; end $$;
+select public.create_order('shop', null, 'Velo Shop A');
+select set_config('request.jwt.claim.sub', :M, false);
+select public.admin_activate_order((select id from service_orders where service='shop'));
+reset role; set role anon; select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((select is_shop and shop_name='Velo Shop A' and active_listings=2 from public.get_shop('SELLER_A')), 'get_shop: магазин с названием и объявлениями');
+select pg_temp.check((select bool_and(shop_until > now()) from listings where model in ('L1','L2')), 'значок «Магазин» на объявлениях');
+select pg_temp.check((select is_shop from public.get_seller((select l1 from ids))), 'get_seller отдаёт is_shop');
+select pg_temp.check(not exists (select 1 from public.get_shop('buyer_b')), 'get_shop не раскрывает покупателей без объявлений');
+
+-- лимит бесплатных объявлений (включаем = 1)
+reset role; update app_settings set free_listing_limit = 1, shop_listing_limit = null;
+update profiles set shop_until = null where id = :A;
+insert into listings (user_id, category, brand_id, model, condition, price, country, city, status)
+values (:A,'bike',(select id from known_brands where name='Trek'),'L3','used',300,'Казахстан','Алматы','draft');
+insert into listing_photos (listing_id, path, kind, position) select l.id, :A||'/'||l.id||'/g'||g||'.webp', case when g=4 then 'brand' else 'general' end, g from listings l, generate_series(1,4) g where l.model='L3';
+insert into listing_verification (listing_id, serial_number, serial_photo_path) select id, 'SN-L3', :A||'/'||id||'/s.webp' from listings where model='L3';
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+do $$ begin perform public.submit_listing((select id from listings where model='L3')); raise exception 'FAIL: лимит не сработал';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: лимит бесплатных объявлений (%)', left(sqlerrm, 50); end $$;
+select public.create_order('extra_listing', (select id from listings where model='L3'));
+select set_config('request.jwt.claim.sub', :M, false);
+select public.admin_activate_order((select id from service_orders where service='extra_listing'));
+select set_config('request.jwt.claim.sub', :A, false);
+select public.submit_listing((select id from listings where model='L3'));
+select pg_temp.check((select status='pending' from listings where model='L3'), 'с «Доп. объявлением» подача проходит');
+reset role; update app_settings set free_listing_limit = null;
+
+-- tick от гостя не чаще раза в 5 минут
+set role anon; select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((public.maintenance_tick(true) ->> 'skipped')::boolean, 'гость не может форсировать tick (троттлинг)');
+
+-- очистка: проданное 40 дней назад
+reset role; update listings set sold_at = now()-interval '40 days' where status='sold';
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+do $$ begin perform * from public.admin_cleanup_candidates(); raise exception 'FAIL: не-админ видит кандидатов';
+exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'ok: очистка только для админа'; end $$;
+select set_config('request.jwt.claim.sub', :M, false);
+select pg_temp.check((select count(*) = 1 and bool_and(array_length(photo_paths,1) = 4 and serial_path is not null) from public.admin_cleanup_candidates()), 'кандидаты на очистку: проданное >30 дней, с путями фото и серийника');
+select pg_temp.check(public.admin_purge_listings(array[(select l1 from ids), (select listing_id from public.admin_cleanup_candidates() limit 1)]) = 1, 'purge удаляет только кандидатов (L1 не тронут)');
+select pg_temp.check((select count(*) from listings where model='L1')=1, 'L1 (не кандидат) не удалён');
+reset role;
 \echo ALL DB TESTS PASSED

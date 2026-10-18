@@ -42,11 +42,14 @@ export function toast(msg, type = 'ok') {
 export function cardHTML(l, favs = new Set()) {
   const fav = favs.has(l.id);
   const meta = [l.year, l.bike_type || api.CATEGORIES[l.category], l.wheel_size].filter(Boolean).map(esc).join(' · ');
-  return `<article class="card${l.featured ? ' is-featured' : ''}">
+  const top = l.featured && (!l.featured_until || api.isOn(l.featured_until));
+  return `<article class="card${top ? ' is-featured' : ''}${api.isOn(l.highlight_until) ? ' is-highlight' : ''}">
     <a class="card-img" href="listing.html?id=${l.id}">
       <img src="${esc(api.photoUrl(l.cover_path))}" alt="${esc(l.title)}" loading="lazy">
       <div class="badges">
-        ${l.featured ? `<span class="badge hot">${ICON.star} Топ</span>` : ''}
+        ${top ? `<span class="badge hot">${ICON.star} Топ</span>` : ''}
+        ${api.isOn(l.urgent_until) ? '<span class="badge urgent">⚡ Срочно</span>' : ''}
+        ${api.isOn(l.shop_until) ? '<span class="badge shop">🏪 Магазин</span>' : ''}
         ${l.verified ? `<span class="badge ok">${ICON.check} Проверено</span>` : ''}
         ${l.condition === 'new' ? '<span class="badge new">Новый</span>' : ''}
         ${l.status === 'sold' ? '<span class="badge sold">Продано</span>' : ''}
@@ -116,7 +119,7 @@ export async function layout(active = '') {
   footer.className = 'site-footer';
   footer.innerHTML = `<div class="wrap foot">
     <div><b>${esc(CONFIG.SITE_NAME)}</b><p>${esc(CONFIG.SITE_TAGLINE)}. Каждое объявление проверяет модератор: реплики и подделки не публикуются.</p></div>
-    <div><a href="list.html">Все объявления</a><a href="rules.html">Правила и проверка подлинности</a><a href="rules.html#data">Какие данные мы храним</a><a href="new.html">Подать объявление</a></div>
+    <div><a href="list.html">Все объявления</a><a href="rules.html">Правила и проверка подлинности</a><a href="rules.html#data">Какие данные мы храним</a><a href="new.html">Подать объявление</a><a href="advertise.html">Реклама и платные услуги</a></div>
     <div><a href="https://t.me/${esc(CONFIG.SUPPORT_TELEGRAM)}" target="_blank" rel="noopener">${ICON.tg} Поддержка и реклама</a><small>© ${new Date().getFullYear()} ${esc(CONFIG.SITE_NAME)}</small></div>
   </div>`;
   document.body.append(footer);
@@ -159,4 +162,44 @@ export function needLogin(me) {
   if (me) return false;
   document.querySelector('main').innerHTML = `<div class="wrap empty"><h1>Нужно войти</h1><p>Войдите через Telegram — это одна кнопка, без паролей.</p><a class="btn btn-primary" href="login.html?next=${encodeURIComponent(location.href)}">${ICON.tg} Войти через Telegram</a></div>`;
   return true;
+}
+
+// Диалог заказа платной услуги: создаёт заявку и даёт кнопку «Открыть Telegram» с готовым текстом.
+export function fmtKZT(n) { return `${Number(n || 0).toLocaleString('ru-RU')} ₸`; }
+export async function orderDialog({ service, listing = null, askNote = null }) {
+  let dlg = document.getElementById('order-dlg');
+  if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'order-dlg'; document.body.append(dlg); }
+  dlg.innerHTML = `<form method="dialog">
+    <h3>${esc(service.title)} — ${fmtKZT(service.price_kzt)}${service.duration_days ? ` <small style="font-weight:600;color:var(--muted)">/ ${service.duration_days} дн.</small>` : ''}</h3>
+    <p class="hint" style="margin:0 0 10px">${esc(service.description || '')}</p>
+    ${listing ? `<p style="margin:0 0 10px">Объявление <b>№ ${listing.id}</b>: ${esc(listing.title)}</p>` : ''}
+    ${askNote ? `<div class="field"><label for="od-note">${esc(askNote.label)}</label><input id="od-note" maxlength="${askNote.max || 60}" value="${esc(askNote.value || '')}" placeholder="${esc(askNote.placeholder || '')}" ${askNote.required ? 'required minlength="2"' : ''}></div>` : ''}
+    <ol class="pay-steps"><li>Нажмите «Заказать» — откроется Telegram <b>@${esc(CONFIG.PAY_TELEGRAM || CONFIG.SUPPORT_TELEGRAM)}</b> с готовым сообщением.</li>
+      <li>Отправьте сообщение и оплатите ${esc(CONFIG.PAY_HOW || 'Kaspi-переводом')}.</li>
+      <li>Администратор включит услугу — обычно в течение нескольких часов.</li></ol>
+    <div class="od-result" hidden></div>
+    <div class="btns"><button value="cancel" class="btn btn-ghost" formnovalidate>Закрыть</button><button value="ok" class="btn btn-accent" id="od-go">Заказать</button></div>
+  </form>`;
+  dlg.showModal();
+  const go = dlg.querySelector('#od-go');
+  go.onclick = async (e) => {
+    e.preventDefault();
+    const noteEl = dlg.querySelector('#od-note');
+    if (noteEl && !noteEl.reportValidity()) return;
+    const note = noteEl?.value.trim() || null;
+    go.disabled = true; go.textContent = 'Создаём заявку…';
+    try {
+      const orderId = await api.orderService(service.code, listing?.id || null, note);
+      const { url, text } = api.payLink({ orderId, service, listing, note });
+      const box = dlg.querySelector('.od-result'); box.hidden = false;
+      box.innerHTML = `<div class="verified-box" style="margin:8px 0 0"><div><b>Заявка № ${orderId} создана.</b> Откройте Telegram и отправьте сообщение — там же договоритесь об оплате.</div></div>
+        <a class="btn btn-tg btn-block" style="margin-top:10px" href="${esc(url)}" target="_blank" rel="noopener">${ICON.tg} Открыть Telegram и оплатить</a>
+        <button type="button" class="btn btn-ghost btn-block btn-sm" style="margin-top:6px" id="od-copy">Скопировать текст сообщения</button>`;
+      box.querySelector('#od-copy').onclick = () => navigator.clipboard?.writeText(text).then(() => toast('Текст скопирован'));
+      go.remove();
+      window.open(url, '_blank', 'noopener');
+      dlg.dispatchEvent(new CustomEvent('ordered', { detail: { orderId } }));
+    } catch (err) { toast(err.message, 'err'); go.disabled = false; go.textContent = 'Заказать'; }
+  };
+  return dlg;
 }

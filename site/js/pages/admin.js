@@ -1,5 +1,5 @@
 import * as api from '../api.js';
-import { $, $$, esc, layout, fmtPrice, timeAgo, toast, brandName, needLogin } from '../ui.js';
+import { $, $$, esc, layout, fmtPrice, timeAgo, toast, brandName, needLogin, fmtKZT } from '../ui.js';
 
 const me = await layout('admin');
 const root = $('#admin-root');
@@ -8,27 +8,40 @@ if (!me.is_admin) {
   root.innerHTML = `<div class="empty"><h1>Доступ только для администратора</h1><p>Чтобы стать админом, выполните SQL из README (раздел «Сделать себя админом»).</p></div>`;
   await new Promise(() => {});
 }
-const TABS = { queue: 'Очередь модерации', all: 'Все объявления', reports: 'Жалобы', ads: 'Реклама', brands: 'Бренды', rates: 'Курсы валют' };
-root.innerHTML = `<h1 style="margin-top:18px">Модерация</h1><div class="tabs" id="tabs">${Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}">${v}</button>`).join('')}</div><div id="pane"></div>`;
+const TABS = { queue: 'Очередь модерации', orders: 'Заказы', all: 'Все объявления', reports: 'Жалобы', ads: 'Реклама', prices: 'Услуги и цены', cleanup: 'Очистка', brands: 'Бренды', rates: 'Курсы валют' };
+root.innerHTML = `<h1 style="margin-top:18px">Модерация</h1>${api.V2 ? '' : '<div class="admin-alert"><span>⚠ Миграция 07 (сроки объявлений, платные услуги, заказы) ещё не применена. Вкладки «Заказы», «Услуги и цены», «Очистка» заработают после неё — см. README.</span></div>'}<div id="admin-alerts"></div><div class="tabs" id="tabs">${Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}">${v}</button>`).join('')}</div><div id="pane"></div>`;
 const pane = $('#pane');
 let tab = location.hash.slice(1) in TABS ? location.hash.slice(1) : 'queue';
 $('#tabs').onclick = (e) => { const t = e.target.closest('[data-tab]')?.dataset.tab; if (t) { tab = t; location.hash = t; show(); } };
+$('#admin-alerts').onclick = (e) => { const t = e.target.closest('[data-go]')?.dataset.go; if (t) { e.preventDefault(); tab = t; location.hash = t; show(); } };
 
 async function counts() {
-  const [q, r] = await Promise.all([api.adminListings('pending').catch(() => []), api.adminReports().catch(() => [])]);
+  const [q, r, o, c] = await Promise.all([api.adminListings('pending').catch(() => []), api.adminReports().catch(() => []),
+    api.V2 ? api.adminOrders('requested').catch(() => []) : [], api.V2 ? api.adminCleanupCandidates().catch(() => []) : []]);
   const set = (k, n) => { const b = $(`[data-tab="${k}"]`); b.querySelector('.cnt')?.remove(); if (n) b.insertAdjacentHTML('beforeend', `<span class="cnt">${n}</span>`); };
-  set('queue', q.length); set('reports', r.filter((x) => x.status === 'open').length);
+  set('queue', q.length); set('reports', r.filter((x) => x.status === 'open').length); set('orders', o.length); set('cleanup', c.length);
+  const al = [];
+  if (o.length) al.push(`<div class="admin-alert"><span>💳 Новых заявок на платные услуги: <b>${o.length}</b>. Когда клиент оплатил — нажмите «Оплачено, включить».</span><a class="btn btn-sm btn-primary" href="#orders" data-go="orders">Открыть заказы</a></div>`);
+  if (c.length) al.push(`<div class="admin-alert"><span>🧹 Старые объявления для очистки (продано / истекло / отклонено больше ${(await api.getSettings()).cleanup_after_days} дней назад): <b>${c.length}</b>.</span><a class="btn btn-sm btn-primary" href="#cleanup" data-go="cleanup">Очистить фото</a></div>`);
+  $('#admin-alerts').innerHTML = al.join('');
 }
 function show() {
   $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   pane.innerHTML = '<div class="skeleton" style="aspect-ratio:auto;height:160px"></div>';
-  ({ queue, all, reports, ads, brands, rates })[tab]().catch((e) => { pane.innerHTML = ''; toast(e.message, 'err'); });
+  ({ queue, orders, all, reports, ads, prices, cleanup, brands, rates })[tab]().catch((e) => { pane.innerHTML = ''; toast(e.message, 'err'); });
 }
 
 function photoStrip(l) {
   const ph = (l.listing_photos || []).map((p) => `<a href="${esc(api.photoUrl(p.path))}" target="_blank" rel="noopener"><img src="${esc(api.photoUrl(p.path))}" alt=""><span class="tag">${p.kind === 'brand' ? 'ЛОГОТИП' : 'фото'}</span></a>`).join('');
   const s = l.verification?.signed_url ? `<a href="${esc(l.verification.signed_url)}" target="_blank" rel="noopener"><img src="${esc(l.verification.signed_url)}" alt=""><span class="tag serial">СЕРИЙНИК 🔒</span></a>` : '';
   return `<div class="mod-photos">${s}${ph}</div>`;
+}
+function svcLine(l) {
+  if (!api.V2) return '';
+  const p = [];
+  if (l.expires_at) p.push(api.isOn(l.expires_at) ? `в каталоге до ${new Date(l.expires_at).toLocaleDateString('ru-RU')}` : 'срок истёк');
+  for (const [k, t] of [['featured_until', 'Топ'], ['auto_renew_until', 'Автопродление'], ['highlight_until', 'Цвет'], ['urgent_until', 'Срочно'], ['shop_until', 'Магазин']]) if (api.isOn(l[k])) p.push(`${t} ещё ${api.daysLeft(l[k])} дн.`);
+  return p.length ? `<div class="meta">⏱ ${p.join(' · ')}</div>` : '';
 }
 function modCard(l, full) {
   const seller = l.seller ? `${esc(l.seller.first_name || '')} ${l.seller.username ? `<a href="https://t.me/${esc(l.seller.username)}" target="_blank" rel="noopener">@${esc(l.seller.username)}</a>` : '(без username)'} · tg_id ${esc(l.seller.tg_id)}` : '';
@@ -37,7 +50,7 @@ function modCard(l, full) {
       <span class="badge st-${l.status}">${api.STATUSES[l.status]}</span> ${l.verified ? '<span class="badge ok">✓ Проверено</span>' : ''} ${l.featured ? '<span class="badge hot">Топ</span>' : ''}
       <h3 style="margin:6px 0 2px"><a href="listing.html?id=${l.id}" target="_blank">${esc(l.title)}</a> · ${fmtPrice(l.price, l.currency)}</h3>
       <div class="meta">${api.CATEGORIES[l.category]}${l.bike_type ? ' · ' + esc(l.bike_type) : ''}${l.year ? ' · ' + l.year : ''} · ${esc(l.city)}, ${esc(l.country)} · №${l.id} · ${timeAgo(l.updated_at || l.created_at)}</div>
-      <div class="meta">Продавец: ${seller}</div></div>
+      <div class="meta">Продавец: ${seller}</div>${svcLine(l)}</div>
       <div style="text-align:right"><div class="hint">Серийный номер</div><span class="serial">${esc(l.verification?.serial_number || '— нет —')}</span>
         ${l.verification?.serial_number ? `<div><button class="btn btn-ghost btn-sm" data-act="dup" style="margin-top:6px">Искать дубли номера</button></div>` : ''}</div>
     </div>
@@ -111,7 +124,9 @@ async function reports() {
     } catch (err) { toast(err.message, 'err'); }
   };
 }
-const SLOTS = { home_top: 'Главная, сверху (1200×240)', list_inline: 'В списке объявлений (1200×240)', listing_side: 'Страница объявления, сбоку (360×600)' };
+const SLOTS = { home_top: 'Главная, сверху (1200×240)', list_inline: 'В списке объявлений (1200×240)', listing_side: 'Страница объявления, сбоку (360×600)',
+  ...(api.V2 ? { gallery_end: 'Последний слайд галереи фото (1200×900, 4:3)' } : {}) };
+const SLOT_SIZE = { listing_side: '360×600 (вертикальный)', gallery_end: '1200×900 (4:3, слайд в галерее)' };
 async function ads() {
   const list = await api.adminAds();
   const dt = (v) => v ? v.slice(0, 16) : '';
@@ -129,13 +144,13 @@ async function ads() {
       <button class="btn btn-primary">Сохранить баннер</button> <button type="reset" class="btn btn-ghost">Очистить</button>
     </form></div>
     <div class="scroll-x" style="margin-top:14px"><table class="t"><tr><th>Баннер</th><th>Место</th><th>Ссылка</th><th>Период</th><th>Статус</th><th></th></tr>
-    ${list.map((a) => `<tr><td><img src="${esc(a.image_url)}" alt=""></td><td>${SLOTS[a.slot]}</td><td><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title || a.url)}</a></td>
+    ${list.map((a) => `<tr><td><img src="${esc(a.image_url)}" alt=""></td><td>${SLOTS[a.slot] || a.slot}</td><td><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title || a.url)}</a></td>
       <td>${a.starts_at ? new Date(a.starts_at).toLocaleDateString('ru-RU') : '—'} – ${a.ends_at ? new Date(a.ends_at).toLocaleDateString('ru-RU') : '∞'}</td><td>${a.active ? '🟢 активен' : '⚪ выключен'}</td>
       <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-edit="${a.id}">Изменить</button> <button class="btn btn-danger btn-sm" data-del="${a.id}">Удалить</button></td></tr>`).join('')}</table></div>`;
   const f = $('#ad-form');
   const prev = $('#ad-preview'), sizeHint = $('#ad-size-hint');
   const showPrev = (src) => { prev.hidden = !src; if (src) prev.querySelector('img').src = src; prev.classList.toggle('side', f.slot.value === 'listing_side'); };
-  const setHint = () => { sizeHint.textContent = `Рекомендуемый размер: ${f.slot.value === 'listing_side' ? '360×600 (вертикальный)' : '1200×240 (широкий баннер)'}. Фото сожмётся автоматически и загрузится в хранилище.`; prev.classList.toggle('side', f.slot.value === 'listing_side'); };
+  const setHint = () => { sizeHint.textContent = `Рекомендуемый размер: ${SLOT_SIZE[f.slot.value] || '1200×240 (широкий баннер)'}. Фото сожмётся автоматически и загрузится в хранилище.`; prev.classList.toggle('side', f.slot.value === 'listing_side'); };
   f.slot.onchange = setHint;
   $('#ad-file').onchange = (e) => { const file = e.target.files[0]; showPrev(file ? URL.createObjectURL(file) : f.image_url.value.trim()); };
   f.image_url.oninput = () => { if (!$('#ad-file').files[0]) showPrev(f.image_url.value.trim()); };
@@ -187,3 +202,80 @@ async function rates() {
   };
 }
 show(); counts();
+
+// ---------------------------------------------------------------- Заказы платных услуг
+const ORDER_ST = { requested: '⏳ ждёт оплаты', paid: '💳 оплачено', active: '✅ включено', cancelled: '— отменён' };
+async function orders() {
+  const st = sessionStorage.getItem('adm-ord') ?? 'requested';
+  const [rows, services] = await Promise.all([api.adminOrders(st || undefined), api.listServices()]);
+  const svc = Object.fromEntries(services.map((x) => [x.code, x]));
+  pane.innerHTML = `<p class="hint">Клиент нажал «Заказать» → написал вам в Telegram с номером заказа → оплатил Kaspi-переводом. Проверьте поступление и нажмите <b>«Оплачено, включить»</b> — услуга включится сразу (сроки считаются от сегодня или продлеваются). Для баннеров (реклама) после оплаты добавьте картинку во вкладке «Реклама».</p>
+    <div class="field" style="max-width:260px"><select id="ord-filter"><option value="">Все заказы</option>${Object.entries(ORDER_ST).map(([k, v]) => `<option value="${k}"${k === st ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
+    ${rows.length ? `<div class="scroll-x"><table class="t"><tr><th>№</th><th>Когда</th><th>Услуга</th><th>Объявление / заметка</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th></th></tr>
+    ${rows.map((o) => `<tr><td><b>${o.id}</b></td><td>${timeAgo(o.created_at)}</td><td>${esc(svc[o.service]?.title || o.service)}${o.days ? ` · ${o.days} дн.` : ''}</td>
+      <td>${o.listing_id ? `<a href="listing.html?id=${o.listing_id}" target="_blank">№ ${o.listing_id}</a> ${esc(o.listings?.title || '')}` : '—'}${o.note ? `<br><small>${esc(o.note)}</small>` : ''}</td>
+      <td>${esc(o.user?.first_name || '')} ${o.user?.username ? `<a href="https://t.me/${esc(o.user.username)}" target="_blank" rel="noopener">@${esc(o.user.username)}</a>` : ''}</td>
+      <td style="white-space:nowrap"><b>${fmtKZT(o.price_kzt)}</b></td><td>${ORDER_ST[o.status] || o.status}${o.activated_at ? `<br><small>${new Date(o.activated_at).toLocaleDateString('ru-RU')}</small>` : ''}</td>
+      <td style="white-space:nowrap">${['requested', 'paid'].includes(o.status) ? `<button class="btn btn-primary btn-sm" data-pay="${o.id}">Оплачено, включить</button> <button class="btn btn-ghost btn-sm" data-cancel="${o.id}">Отменить</button>` : ''}</td></tr>`).join('')}</table></div>`
+    : '<div class="empty"><h2>Заказов нет</h2><p>Когда пользователь закажет услугу в «Мои объявления», заявка появится здесь.</p></div>'}`;
+  $('#ord-filter').onchange = (e) => { sessionStorage.setItem('adm-ord', e.target.value); orders(); };
+  pane.onclick = async (e) => {
+    const t = e.target.dataset;
+    try {
+      if (t.pay) { if (!confirm(`Деньги по заказу № ${t.pay} пришли? Услуга включится сразу.`)) return; await api.adminActivateOrder(+t.pay); toast('Услуга включена'); }
+      else if (t.cancel) { if (!confirm('Отменить заказ?')) return; await api.adminCancelOrder(+t.cancel); toast('Заказ отменён'); }
+      else return;
+      orders(); counts();
+    } catch (err) { toast(err.message, 'err'); }
+  };
+}
+// ---------------------------------------------------------------- Цены услуг и настройки
+async function prices() {
+  const [list, st] = await Promise.all([api.listServices(), api.getSettings()]);
+  const KIND = { listing: 'Для объявления', account: 'Для аккаунта', ad: 'Реклама (баннеры)' };
+  pane.innerHTML = `<div class="panel"><h2>Цены платных услуг</h2><p class="hint">Цены в тенге. Изменения действуют для новых заказов. «Дней» — на сколько включается услуга (0 — разово).</p>
+    <div class="scroll-x"><table class="t" id="svc-t"><tr><th>Услуга</th><th>Тип</th><th>Цена, ₸</th><th>Дней</th><th>Вкл.</th><th></th></tr>
+    ${list.map((x) => `<tr data-code="${esc(x.code)}"><td><b>${esc(x.title)}</b><br><small>${esc(x.description)}</small></td><td>${KIND[x.kind] || x.kind}</td>
+      <td><input type="number" min="0" step="50" name="price_kzt" value="${x.price_kzt}" style="width:110px"></td>
+      <td><input type="number" min="0" max="365" name="duration_days" value="${x.duration_days}" style="width:70px"></td>
+      <td><input type="checkbox" name="active"${x.active ? ' checked' : ''}></td>
+      <td><button class="btn btn-primary btn-sm" data-save="${esc(x.code)}">Сохранить</button></td></tr>`).join('')}</table></div></div>
+    <div class="panel" style="margin-top:14px"><h2>Сроки и лимиты</h2><form id="st-form">
+      <div class="row"><div class="field"><label>Срок показа объявления, дней</label><input type="number" name="listing_days" min="1" max="365" value="${st.listing_days}"></div>
+        <div class="field"><label>Продлить можно за N дней до конца</label><input type="number" name="renew_window_days" min="0" max="365" value="${st.renew_window_days}"></div></div>
+      <div class="row"><div class="field"><label>Автопродление поднимает каждые N дней</label><input type="number" name="auto_bump_days" min="1" max="30" value="${st.auto_bump_days}"></div>
+        <div class="field"><label>Очистка фото через N дней после продажи/истечения</label><input type="number" name="cleanup_after_days" min="1" max="365" value="${st.cleanup_after_days}"></div></div>
+      <div class="row"><div class="field"><label>Бесплатный лимит активных объявлений (пусто = без лимита)</label><input type="number" name="free_listing_limit" min="1" max="1000" value="${st.free_listing_limit ?? ''}" placeholder="выключено"></div>
+        <div class="field"><label>Лимит для «Магазина» (пусто = без лимита)</label><input type="number" name="shop_listing_limit" min="1" max="10000" value="${st.shop_listing_limit ?? ''}" placeholder="без лимита"></div></div>
+      <button class="btn btn-primary">Сохранить настройки</button></form></div>`;
+  pane.onclick = async (e) => {
+    const code = e.target.dataset.save; if (!code) return;
+    const tr = e.target.closest('tr');
+    try { await api.adminSaveService(code, { price_kzt: tr.querySelector('[name=price_kzt]').value, duration_days: tr.querySelector('[name=duration_days]').value, active: tr.querySelector('[name=active]').checked }); toast('Цена сохранена'); }
+    catch (err) { toast(err.message, 'err'); }
+  };
+  $('#st-form').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api.adminSaveSettings(Object.fromEntries(new FormData(e.target))); toast('Настройки сохранены'); } catch (err) { toast(err.message, 'err'); }
+  };
+}
+// ---------------------------------------------------------------- Очистка старых фото
+async function cleanup() {
+  const [list, st] = await Promise.all([api.adminCleanupCandidates(), api.getSettings()]);
+  const files = list.reduce((n, c) => n + (c.photo_paths?.length || 0) + (c.serial_path ? 1 : 0), 0);
+  pane.innerHTML = `<div class="panel"><h2>Очистка старых объявлений и фото</h2>
+    <p class="hint">Удаляются объявления, которые <b>проданы, истекли или отклонены больше ${st.cleanup_after_days} дней назад</b>, вместе со всеми фото (и приватным фото серийника). Так база и хранилище не переполняются, а лишние данные не копятся. Объявления с действующим автопродлением не трогаются.
+    Файлы удаляются из хранилища через ваш админ-доступ, затем удаляются записи. Заказы остаются в истории.</p>
+    ${list.length ? `<p>Найдено: <b>${list.length}</b> объявл., файлов: <b>${files}</b>${list.length >= 100 ? ' (показаны первые 100 — после очистки нажмите ещё раз)' : ''}.</p>
+      <div class="scroll-x"><table class="t"><tr><th>№</th><th>Статус</th><th>С какого дня</th><th>Фото</th></tr>${list.map((c) => `<tr><td>${c.listing_id}</td><td>${api.STATUSES[c.status] || c.status}</td><td>${c.since ? new Date(c.since).toLocaleDateString('ru-RU') : '—'}</td><td>${(c.photo_paths?.length || 0) + (c.serial_path ? ' + серийник' : '')}</td></tr>`).join('')}</table></div>
+      <p style="margin-top:12px"><button class="btn btn-danger" id="cl-run">🧹 Очистить старые фото и объявления (${list.length})</button> <span class="hint" id="cl-prog"></span></p>`
+    : '<div class="empty"><h2>Чистить нечего 👍</h2><p>Когда появятся старые проданные/истёкшие объявления, здесь и вверху админки появится напоминание.</p></div>'}</div>`;
+  $('#cl-run')?.addEventListener('click', async (e) => {
+    if (!confirm(`Удалить навсегда ${list.length} старых объявлений и ${files} файлов? Отменить нельзя.`)) return;
+    e.target.disabled = true;
+    try {
+      const r = await api.adminCleanupRun((i, n) => { $('#cl-prog').textContent = `${i} / ${n}…`; });
+      toast(`Удалено объявлений: ${r.listings}, файлов: ${r.files}`); cleanup(); counts();
+    } catch (err) { toast(err.message, 'err'); e.target.disabled = false; }
+  });
+}

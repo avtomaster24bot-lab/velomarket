@@ -303,3 +303,49 @@ table.t{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 .ad-preview{margin:6px 0 14px;max-width:600px;border-radius:12px;overflow:hidden;box-shadow:var(--sh)}.ad-preview img{width:100%;display:block}.ad-preview.side{max-width:180px}
+
+/* ---------- платные услуги ---------- */
+.badge.urgent{background:#e5484d;color:#fff}
+.badge.shop{background:#6d4aff;color:#fff}
+.badge.st-expired{background:#f3e8ff;color:#6b21a8}
+.card.is-highlight{background:#fff8db;box-shadow:0 0 0 2px #ffd84d,var(--sh)}
+.card.is-highlight .card-body{background:#fff8db}
+.pay-steps{margin:8px 0 4px;padding-left:20px;font-size:14px;color:var(--ink2)}.pay-steps li{margin:3px 0}
+.promo{grid-column:1/-1;border-top:1px dashed #dde3e8;margin-top:8px;padding-top:8px}
+.promo-h{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.promo-btns{display:flex;flex-wrap:wrap;gap:6px}
+.promo-btns button{border:1px solid #dfe5ea;background:#fff;border-radius:10px;padding:6px 10px;font:700 13px var(--font);color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.promo-btns button:hover{border-color:var(--green)}
+.promo-btns button small{font-weight:600;color:var(--muted)}
+.promo-btns button.on{background:var(--green-l);border-color:var(--green);color:var(--green-d)}
+.promo-btns button.wait{background:#fff4d6;border-color:#f3d27a}
+.exp{font-size:13px;margin-top:4px}.exp.warn{color:#b45309;font-weight:700}.exp.bad{color:#b42318;font-weight:700}
+.g-ad{position:absolute;inset:0;display:block;background:#0f1a22}
+.g-ad img{width:100%;height:100%;object-fit:contain}
+.g-ad .ad-label,.lightbox .ad-label{position:absolute;left:10px;top:10px;right:auto}
+.g-thumbs .g-thumb-ad{width:76px;height:58px;border-radius:8px;flex:none;display:grid;place-items:center;background:#16212b;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;cursor:pointer;opacity:.7;border:2px solid transparent}
+.g-thumbs .g-thumb-ad.on{opacity:1;border-color:var(--green)}
+.lightbox .lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.9);font-size:26px;cursor:pointer}
+.lightbox .lb-prev{left:12px}.lightbox .lb-next{right:12px}
+.lightbox .lb-close{position:absolute;top:14px;right:14px}
+.lightbox .lb-count{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;background:rgba(0,0,0,.5);padding:3px 10px;border-radius:8px}
+.lightbox a.lb-ad{position:relative;display:block}
+.lightbox a.lb-ad img{max-width:94vw;max-height:86vh}
+.price-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.price-table td,.price-table th{padding:10px 12px;border-bottom:1px solid #eef1f4;text-align:left;font-size:14px;vertical-align:top}
+.price-table th{background:#f6f8fa;font-size:12px;text-transform:uppercase;color:var(--muted)}
+.price-table td.p{white-space:nowrap;font-weight:800}
+.slots{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:760px){.slots{grid-template-columns:1fr 1fr}}
+.slot-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;display:flex;flex-direction:column}
+.slot-card .prev{background:#eef2f5;padding:12px;display:grid;place-items:center;min-height:150px}
+.slot-card .prev img{max-height:200px;width:auto;max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.slot-card .b{padding:14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.slot-card .b .price{font-size:20px;font-weight:800}
+.slot-card .b .btn{margin-top:auto}
+.shop-head{display:flex;gap:14px;align-items:center;background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:16px;margin:18px 0}
+.shop-head .ava{width:58px;height:58px;font-size:24px}
+.admin-alert{background:#fff4d6;border:1px solid #f3d27a;color:#7a5600;border-radius:12px;padding:10px 14px;margin:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seller-all{display:block;font-size:13px;font-weight:700;margin-top:3px}
+.lst>*{min-width:0}
+.lightbox .lb-body{max-width:94vw;display:grid;place-items:center}
