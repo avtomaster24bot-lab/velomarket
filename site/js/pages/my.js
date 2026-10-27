@@ -1,5 +1,5 @@
 import * as api from '../api.js';
-import { $, esc, layout, fmtPrice, timeAgo, params, toast, needLogin, orderDialog, fmtKZT } from '../ui.js';
+import { $, esc, layout, fmtPrice, timeAgo, params, toast, needLogin, orderDialog, fmtKZT, editListingDialog } from '../ui.js';
 
 const me = await layout('my');
 const root = $('#my-root');
@@ -74,7 +74,8 @@ if (!needLogin(me)) {
           ${l.status === 'draft' ? '<div class="reason" style="background:#eef1f4;color:var(--ink2)">Черновик: допишите и отправьте на модерацию</div>' : ''}</div>
         <div class="btns">
           ${canRenew(l) ? `<button class="btn btn-primary btn-sm" data-renew="${l.id}">Продлить на ${settings.listing_days} дней — бесплатно</button>` : ''}
-          ${l.status !== 'sold' ? `<a class="btn btn-ghost btn-sm" href="new.html?id=${l.id}">${l.status === 'draft' || l.status === 'rejected' ? 'Исправить и отправить' : 'Редактировать'}</a>` : ''}
+          ${['approved', 'expired', 'pending'].includes(l.status) ? `<button class="btn btn-primary btn-sm" data-edit="${l.id}">✏️ Редактировать</button><a class="btn btn-ghost btn-sm" href="new.html?id=${l.id}">Фото и все поля</a>` : ''}
+          ${['draft', 'rejected'].includes(l.status) ? `<a class="btn btn-ghost btn-sm" href="new.html?id=${l.id}">Исправить и отправить</a>` : ''}
           ${['approved', 'expired'].includes(l.status) ? `<button class="btn btn-ghost btn-sm" data-sold="${l.id}">Отметить «Продано»</button>` : ''}
           <button class="btn btn-danger btn-sm" data-del="${l.id}">Удалить</button>
         </div>
@@ -94,9 +95,15 @@ if (!needLogin(me)) {
           <td>${o.status === 'requested' ? `<a class="btn btn-tg btn-sm" target="_blank" rel="noopener" href="${esc(api.payLink({ orderId: o.id, service: s, listing: l, price: o.price_kzt, note: o.note }).url)}">Оплатить в Telegram</a>` : ''}</td></tr>`; }).join('')}</table></div>`;
   }
   $('#my-list').addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-sold],[data-del],[data-renew],[data-promo]'); if (!t) return;
-    const { sold: s, del: d, renew: r, promo: p } = t.dataset;
+    const t = e.target.closest('[data-sold],[data-del],[data-renew],[data-promo],[data-edit]'); if (!t) return;
+    const { sold: s, del: d, renew: r, promo: p, edit: ed } = t.dataset;
     try {
+      if (ed) {
+        const full = await api.getListing(ed);
+        if (!full) throw new Error('Объявление не найдено');
+        editListingDialog(full, me.is_admin ? 'admin' : 'owner', () => load());
+        return;
+      }
       if (s && confirm('Отметить как проданное? Объявление уйдёт из каталога.')) { await api.markSold(s); toast('Отмечено как проданное'); load(); }
       if (d && confirm('Удалить объявление навсегда вместе с фото?')) { await api.deleteListing(d); toast('Удалено'); load(); }
       if (r) { const until = await api.renewListing(r); toast(`Продлено до ${new Date(until).toLocaleDateString('ru-RU')}`); load(); }

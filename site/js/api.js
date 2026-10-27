@@ -329,6 +329,31 @@ export async function updateListing(id, fields) {
   if (IS_DEMO) demoOnly();
   must(await (await client()).from('listings').update(pick(fields)).eq('id', +id));
 }
+// Быстрая правка цены и текста (админ — статус не меняется; продавец — одобренное уходит на модерацию,
+// это делает триггер listings_guard в базе). Возвращает новый статус.
+export const QUICK_FIELDS = ['model', 'price', 'currency', 'condition', 'year', 'bike_type', 'frame_size', 'wheel_size', 'city', 'country', 'description'];
+export async function quickEditListing(id, fields) {
+  const patch = Object.fromEntries(QUICK_FIELDS.filter((k) => k in fields).map((k) => [k, fields[k] === '' ? null : fields[k]]));
+  if ('description' in patch) patch.description = patch.description || '';
+  if (IS_DEMO) {
+    await D(); const l = demo.listings.find((x) => x.id === +id); const me = demoMe();
+    if (!l || !me || !(me.is_admin || l.user_id === me.id)) throw new Error('Недостаточно прав для этого действия');
+    const changed = Object.keys(patch).some((k) => String(patch[k] ?? '') !== String(l[k] ?? ''));
+    if (!me.is_admin && changed && !l.prev_values && ['approved', 'expired', 'pending'].includes(l.status)) {
+      l.prev_values = Object.fromEntries(['title', 'category', ...QUICK_FIELDS].map((k) => [k, l[k] ?? null]));
+      l.owner_edited_at = new Date().toISOString();
+    }
+    Object.assign(l, patch);
+    l.title = [l.known_brands?.name || demo.brands.find((b) => b.id === Number(l.brand_id))?.name || l.brand_other, l.model].filter(Boolean).join(' ');
+    if (!me.is_admin && changed && ['approved', 'expired'].includes(l.status)) { l.status = 'pending'; l.verified = false; }
+    return { id: l.id, status: l.status, title: l.title };
+  }
+  const s = await client();
+  const rows = must(await s.from('listings').update(patch).eq('id', +id).select('id,status,title'));
+  // RLS не даёт ошибку, а просто не обновляет строку — сообщаем понятным текстом
+  if (!rows?.length) throw new Error('Не удалось сохранить: нет прав на это объявление или оно удалено. Обновите страницу и войдите снова.');
+  return rows[0];
+}
 export async function uploadListingPhoto(listingId, blob, ext, kind, position) {
   const s = await client(); const me = await getMe();
   const path = `${me.id}/${listingId}/${kind}-${rnd()}.${ext}`;

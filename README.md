@@ -85,6 +85,8 @@ tests/                    локальные тесты базы (PostgreSQL) и
    - **service_role / secret key**: никуда не копируйте. Edge Function получает его от Supabase сама.
 
 ### 3. Создать таблицы
+> **Правка объявлений (миграция 08):** админ меняет цену и текст в «Модерации» (кнопка «✏️ Редактировать», статус не меняется); продавец правит своё в «Мои объявления» — одобренное после правки снова уходит на модерацию, модератор видит, что изменилось. Выполните `supabase/migrations/20261027000008_edit_listings.sql` (сырой текст: https://raw.githubusercontent.com/avtomaster24bot-lab/velomarket/main/supabase/migrations/20261027000008_edit_listings.sql) → SQL Editor → Run. Без неё правка тоже работает (защита из миграции 07), только без блока «что изменил продавец».
+>
 > **Обновление до платных услуг (сроки, Топ, заказы, «Магазин», реклама в галерее):** если таблицы уже созданы, выполните ОДИН файл
 > `supabase/migrations/20261018000007_monetization.sql` (сырой текст: https://raw.githubusercontent.com/avtomaster24bot-lab/velomarket/main/supabase/migrations/20261018000007_monetization.sql) → SQL Editor → Run. Функцию входа переустанавливать не нужно.
 >

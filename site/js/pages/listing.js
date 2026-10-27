@@ -1,6 +1,6 @@
 import * as api from '../api.js';
 import { CONFIG } from '../config.js';
-import { $, $$, esc, layout, fmtPrice, timeAgo, renderAds, params, ICON, toast, brandName, adSrc } from '../ui.js';
+import { $, $$, esc, layout, fmtPrice, timeAgo, renderAds, params, ICON, toast, brandName, adSrc, editListingDialog } from '../ui.js';
 
 const me = await layout();
 const id = Number(params().id);
@@ -52,13 +52,15 @@ async function render() {
         <div class="actions">
           <a class="btn btn-tg btn-block" id="tg-btn" href="#" target="_blank" rel="noopener">${ICON.tg} Написать продавцу в Telegram</a>
           <button class="btn btn-ghost btn-block" id="fav-btn">${ICON.heart} В избранное</button>
-          ${own ? `<a class="btn btn-primary btn-block" href="new.html?id=${l.id}">Редактировать</a>` : `<button class="btn btn-danger btn-block btn-sm" id="report-btn">Пожаловаться</button>`}
+          ${own ? (['approved', 'expired', 'pending'].includes(l.status) ? `<button class="btn btn-primary btn-block" id="quick-edit">✏️ Редактировать</button><a class="btn btn-ghost btn-block btn-sm" style="margin-top:6px" href="new.html?id=${l.id}">Фото и все поля</a>` : l.status === 'sold' ? '' : `<a class="btn btn-primary btn-block" href="new.html?id=${l.id}">Редактировать</a>`) : `${me?.is_admin ? '<button class="btn btn-primary btn-block btn-sm" id="quick-edit">✏️ Редактировать (админ)</button>' : ''}<button class="btn btn-danger btn-block btn-sm" id="report-btn">Пожаловаться</button>`}
         </div>
       </div>
       <div class="panel warn-box" style="margin-top:14px"><b>Безопасная сделка:</b> осмотрите велосипед лично, сверьте номер рамы, не вносите предоплату незнакомцам.</div>
       <div class="ad-slot" id="ad-side" style="margin-top:14px"></div>
     </aside>
   </div>`;
+
+  $('#quick-edit')?.addEventListener('click', () => editListingDialog(l, me?.is_admin ? 'admin' : 'owner', () => setTimeout(() => location.reload(), 900)));
 
   // галерея: фото + (если есть) последний слайд — реклама gallery_end (случайная из активных)
   const ads = await api.getAds('gallery_end').catch(() => []);

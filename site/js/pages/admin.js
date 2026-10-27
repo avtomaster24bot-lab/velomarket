@@ -1,5 +1,5 @@
 import * as api from '../api.js';
-import { $, $$, esc, layout, fmtPrice, timeAgo, toast, brandName, needLogin, fmtKZT } from '../ui.js';
+import { $, $$, esc, layout, fmtPrice, timeAgo, toast, brandName, needLogin, fmtKZT, editListingDialog } from '../ui.js';
 
 const me = await layout('admin');
 const root = $('#admin-root');
@@ -43,6 +43,18 @@ function svcLine(l) {
   for (const [k, t] of [['featured_until', 'Топ'], ['auto_renew_until', 'Автопродление'], ['highlight_until', 'Цвет'], ['urgent_until', 'Срочно'], ['shop_until', 'Магазин']]) if (api.isOn(l[k])) p.push(`${t} ещё ${api.daysLeft(l[k])} дн.`);
   return p.length ? `<div class="meta">⏱ ${p.join(' · ')}</div>` : '';
 }
+// что продавец изменил после одобрения (заполняет миграция 08)
+const CH_LABELS = { title: 'Название', price: 'Цена', currency: 'Валюта', condition: 'Состояние', year: 'Год', bike_type: 'Тип',
+  frame_size: 'Рама', wheel_size: 'Колёса', city: 'Город', country: 'Страна', category: 'Категория' };
+function changesBlock(l) {
+  const p = l.prev_values; if (!p) return '';
+  const fmt = (k, v) => k === 'condition' ? (api.CONDITIONS[v] || v) : k === 'category' ? (api.CATEGORIES[v] || v) : (v ?? '—');
+  const rows = Object.keys(CH_LABELS).filter((k) => k in p && String(p[k] ?? '') !== String(l[k] ?? ''))
+    .map((k) => k === 'price' ? `<div>${CH_LABELS[k]}: <s>${fmtPrice(p.price, p.currency)}</s> → <b>${fmtPrice(l.price, l.currency)}</b></div>`
+      : `<div>${CH_LABELS[k]}: <s>${esc(fmt(k, p[k]))}</s> → <b>${esc(fmt(k, l[k]))}</b></div>`);
+  if (String(p.description ?? '') !== String(l.description ?? '')) rows.push(`<div>Описание изменено. Было:<div class="ch-desc"><s>${esc(p.description || '—')}</s></div></div>`);
+  return `<div class="changes">✏️ <b>Продавец изменил объявление${l.owner_edited_at ? ' ' + timeAgo(l.owner_edited_at) : ''}</b>${rows.length ? rows.join('') : '<div>Поля вернули как было.</div>'}</div>`;
+}
 function modCard(l, full) {
   const seller = l.seller ? `${esc(l.seller.first_name || '')} ${l.seller.username ? `<a href="https://t.me/${esc(l.seller.username)}" target="_blank" rel="noopener">@${esc(l.seller.username)}</a>` : '(без username)'} · tg_id ${esc(l.seller.tg_id)}` : '';
   return `<div class="mod" data-id="${l.id}">
@@ -55,9 +67,11 @@ function modCard(l, full) {
         ${l.verification?.serial_number ? `<div><button class="btn btn-ghost btn-sm" data-act="dup" style="margin-top:6px">Искать дубли номера</button></div>` : ''}</div>
     </div>
     ${!l.brand_id ? `<div class="close-review" style="margin-top:8px">⚠ Бренд не из справочника: «${esc(l.brand_other)}» — усиленная проверка</div>` : `<div class="hint">Бренд: ${esc(brandName(l))} (${esc(l.known_brands?.country || '')})</div>`}
+    ${changesBlock(l)}
     ${photoStrip(l)}
     <details><summary class="hint" style="cursor:pointer">Описание</summary><div class="desc">${esc(l.description || '—')}</div></details>
     <div class="mod-actions">
+      <button class="btn btn-ghost btn-sm" data-act="edit">✏️ Редактировать</button>
       ${l.status !== 'approved' ? '<button class="btn btn-primary btn-sm" data-act="approve">Одобрить</button><button class="btn btn-primary btn-sm" data-act="approve-v">Одобрить + ✓ Проверено</button>' : ''}
       ${l.status !== 'rejected' ? '<button class="btn btn-danger btn-sm" data-act="reject">Отклонить…</button>' : ''}
       ${full ? `<button class="btn btn-ghost btn-sm" data-act="verified">${l.verified ? 'Снять «Проверено»' : 'Поставить «Проверено»'}</button>
@@ -69,6 +83,10 @@ function bindMod(reload) {
   pane.onclick = async (e) => {
     const act = e.target.dataset.act; if (!act) return;
     const id = +e.target.closest('[data-id]').dataset.id; const l = rows.find((r) => r.id === id);
+    if (act === 'edit') {
+      editListingDialog(l, 'admin', () => { reload(); counts(); });
+      return;
+    }
     try {
       if (act === 'approve') await api.adminUpdateListing(id, { status: 'approved', rejection_reason: null });
       if (act === 'approve-v') await api.adminUpdateListing(id, { status: 'approved', verified: true, rejection_reason: null });

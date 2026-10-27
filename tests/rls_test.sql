@@ -244,4 +244,35 @@ select pg_temp.check((select count(*) = 1 and bool_and(array_length(photo_paths,
 select pg_temp.check(public.admin_purge_listings(array[(select l1 from ids), (select listing_id from public.admin_cleanup_candidates() limit 1)]) = 1, 'purge удаляет только кандидатов (L1 не тронут)');
 select pg_temp.check((select count(*) from listings where model='L1')=1, 'L1 (не кандидат) не удалён');
 reset role;
+
+-- ===== 08: правка объявлений админом и продавцом =====
+reset role;
+insert into listings (user_id, category, brand_id, model, condition, price, country, city, description, status, published_at, expires_at, verified)
+values (:A,'bike',(select id from known_brands where name='Trek'),'E1','used',500,'Казахстан','Алматы','Старый текст','approved', now(), now()+interval '20 days', true);
+set role authenticated; select set_config('request.jwt.claim.sub', :M, false);
+update listings set price = 450, description = 'Текст поправил админ' where model='E1';
+select pg_temp.check((select status='approved' and verified and price=450 and prev_values is null from listings where model='E1'), 'админ правит цену/текст — статус не меняется');
+select set_config('request.jwt.claim.sub', :B, false);
+update listings set price = 1 where model='E1';
+reset role; select pg_temp.check((select price=450 from listings where model='E1'), 'чужой не может править объявление');
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+update listings set price = 400, model = 'E1x', description = 'Новый текст' where model='E1';
+select pg_temp.check((select status='pending' and not verified and price=400 and title='Trek E1x' and owner_edited_at is not null
+  and (prev_values->>'price')::numeric=450 and prev_values->>'description'='Текст поправил админ' from listings where model='E1x'), 'правка продавцом → на модерацию, старые значения сохранены');
+update listings set price = 390 where model='E1x';
+select pg_temp.check((select status='pending' and (prev_values->>'price')::numeric=450 from listings where model='E1x'), 'повторная правка: снимок «как было» не перезаписан');
+update listings set prev_values = null, owner_edited_at = null where model='E1x';
+select pg_temp.check((select prev_values is not null from listings where model='E1x'), 'продавец не может стереть снимок');
+reset role; set role anon; select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((select count(*)=0 from listings where model='E1x'), 'на модерации — скрыто из каталога');
+reset role; set role authenticated; select set_config('request.jwt.claim.sub', :M, false);
+update listings set description = 'Админ поправил на модерации' where model='E1x';
+select pg_temp.check((select status='pending' and prev_values is not null from listings where model='E1x'), 'админ правит на модерации — остаётся на модерации');
+update listings set status = 'approved' where model='E1x';
+select pg_temp.check((select status='approved' and prev_values is null and owner_edited_at is null from listings where model='E1x'), 'одобрение очищает снимок');
+reset role; update profiles set is_banned = true where id = :A;
+set role authenticated; select set_config('request.jwt.claim.sub', :A, false);
+update listings set price = 1 where model='E1x';
+reset role; select pg_temp.check((select price=390 from listings where model='E1x'), 'заблокированный не может править');
+update profiles set is_banned = false where id = :A;
 \echo ALL DB TESTS PASSED

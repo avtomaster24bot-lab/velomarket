@@ -204,3 +204,68 @@ export async function orderDialog({ service, listing = null, askNote = null }) {
   };
   return dlg;
 }
+
+// Быстрая правка цены и текста объявления: mode 'admin' (статус не меняется) или 'owner' (уходит на модерацию)
+export function editListingDialog(l, mode = 'owner', onSaved = () => {}) {
+  let dlg = document.getElementById('edit-dlg');
+  if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'edit-dlg'; dlg.className = 'edit-dlg'; document.body.append(dlg); }
+  const admin = mode === 'admin';
+  const brand = brandName(l);
+  const opt = (arr, v) => arr.map((x) => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('');
+  const warn = admin
+    ? `<p class="hint" style="margin:0 0 12px">Вы правите как администратор — статус объявления («${esc(api.STATUSES[l.status] || l.status)}») не изменится.</p>`
+    : ['approved', 'expired'].includes(l.status)
+      ? '<p class="warn-box" style="margin:0 0 12px">⚠ После изменения объявление снова уйдёт на модерацию и будет скрыто из каталога, пока модератор его не одобрит.</p>'
+      : l.status === 'pending' ? '<p class="hint" style="margin:0 0 12px">Объявление уже на модерации — модератор увидит новую версию.</p>' : '';
+  dlg.innerHTML = `<form method="dialog" novalidate>
+    <h3>Редактировать объявление <small style="font-weight:600;color:var(--muted)">№ ${l.id}</small></h3>
+    ${warn}
+    <div class="field"><label for="ed-model">Модель${brand ? ` <span class="hint">(название: «${esc(brand)} + модель»)</span>` : ''}</label>
+      <input id="ed-model" name="model" maxlength="120" required value="${esc(l.model || '')}"></div>
+    <div class="row">
+      <div class="field"><label for="ed-price">Цена</label><input id="ed-price" name="price" type="number" inputmode="numeric" min="0" step="1" required value="${esc(l.price != null ? Math.round(Number(l.price)) : '')}"></div>
+      <div class="field"><label for="ed-cur">Валюта</label><select id="ed-cur" name="currency">${opt(api.CURRENCIES, l.currency || 'KZT')}</select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="ed-cond">Состояние</label><select id="ed-cond" name="condition">${Object.entries(api.CONDITIONS).map(([k, v]) => `<option value="${k}"${k === l.condition ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="ed-year">Год</label><input id="ed-year" name="year" type="number" inputmode="numeric" min="1950" max="2100" value="${esc(l.year || '')}"></div>
+    </div>
+    ${l.category === 'bike' ? `<div class="field"><label for="ed-type">Тип велосипеда</label><select id="ed-type" name="bike_type">${opt(api.BIKE_TYPES, l.bike_type)}</select></div>` : ''}
+    <div class="row">
+      <div class="field"><label for="ed-frame">Размер рамы</label><input id="ed-frame" name="frame_size" maxlength="20" value="${esc(l.frame_size || '')}"></div>
+      <div class="field"><label for="ed-wheel">Размер колёс</label><input id="ed-wheel" name="wheel_size" maxlength="20" value="${esc(l.wheel_size || '')}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="ed-city">Город</label><input id="ed-city" name="city" maxlength="80" required value="${esc(l.city || '')}"></div>
+      <div class="field"><label for="ed-country">Страна</label><select id="ed-country" name="country">${opt(api.COUNTRIES.includes(l.country) ? api.COUNTRIES : [l.country, ...api.COUNTRIES], l.country)}</select></div>
+    </div>
+    <div class="field"><label for="ed-desc">Описание</label><textarea id="ed-desc" name="description" maxlength="5000">${esc(l.description || '')}</textarea></div>
+    ${admin ? '' : `<p class="hint" style="margin:-6px 0 0">Фото и серийный номер — в <a href="new.html?id=${l.id}">полной форме</a>.</p>`}
+    <div class="ed-err reason" hidden></div>
+    <div class="btns"><button value="cancel" class="btn btn-ghost" formnovalidate>Отмена</button>
+      <button value="ok" class="btn ${admin ? 'btn-primary' : 'btn-accent'}" id="ed-save">${admin || !['approved', 'expired'].includes(l.status) ? 'Сохранить' : 'Сохранить и отправить на модерацию'}</button></div>
+  </form>`;
+  dlg.showModal();
+  const f = dlg.querySelector('form'); const btn = dlg.querySelector('#ed-save'); const err = dlg.querySelector('.ed-err');
+  const fail = (m) => { err.hidden = false; err.textContent = m; };
+  btn.onclick = async (e) => {
+    e.preventDefault(); err.hidden = true;
+    const v = (n) => f.elements[n]?.value.trim();
+    if (!v('model')) return fail('Укажите модель');
+    if (v('price') === '' || !(Number(v('price')) >= 0)) return fail('Укажите цену (число, 0 или больше)');
+    if (v('year') && !(Number(v('year')) >= 1950 && Number(v('year')) <= 2100)) return fail('Год — от 1950 до 2100');
+    if (!v('city')) return fail('Укажите город');
+    const fields = { model: v('model'), price: Number(v('price')), currency: v('currency'), condition: v('condition'),
+      year: v('year') ? Number(v('year')) : null, frame_size: v('frame_size'), wheel_size: v('wheel_size'),
+      city: v('city'), country: v('country'), description: v('description') };
+    if (l.category === 'bike') fields.bike_type = v('bike_type');
+    btn.disabled = true; const t = btn.textContent; btn.textContent = 'Сохраняем…';
+    try {
+      const res = await api.quickEditListing(l.id, fields);
+      dlg.close('saved');
+      onSaved(res);
+      toast(!admin && res.status === 'pending' ? 'Сохранено. Статус: «На модерации»' : 'Изменения сохранены');
+    } catch (ex) { fail(ex.message); btn.disabled = false; btn.textContent = t; }
+  };
+  return dlg;
+}

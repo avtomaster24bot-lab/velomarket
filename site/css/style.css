@@ -349,3 +349,10 @@ table.t{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--
 .seller-all{display:block;font-size:13px;font-weight:700;margin-top:3px}
 .lst>*{min-width:0}
 .lightbox .lb-body{max-width:94vw;display:grid;place-items:center}
+
+/* быстрая правка объявления */
+dialog.edit-dlg{max-width:580px;max-height:calc(100dvh - 24px);overflow:auto;padding:20px}
+dialog.edit-dlg textarea{min-height:150px}
+@media (max-width:599px){dialog.edit-dlg{width:calc(100% - 16px);padding:16px}dialog.edit-dlg .row{gap:8px}}
+.changes{background:#fff8e6;border:1px solid #f3dfa4;border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13px;color:#5c4300}
+.changes b{color:#7a5600}.changes s{color:#9a8a6a}.changes .ch-desc{white-space:pre-wrap;max-height:120px;overflow:auto;margin-top:4px}
